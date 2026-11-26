@@ -857,13 +857,44 @@ test('marks: undo all clears verdicts too', async () => {
   await verdicts(p, 'm1').nth(0).click();
   await verdicts(p, 'm3').nth(1).click();
   await p.locator('#fixwords-reset').click();
-  p.once('dialog', async d => { await d.accept(); });
+  let message = '';
+  p.once('dialog', async d => { message = d.message(); await d.accept(); });
   await p.locator('#fixwords-reset-all').click();
+  assert.equal(message, '直した文言とコメント、判定をすべて元に戻します。よろしいですか？');
   assert.equal(await checked(p, 'm1'), 'false,false');
   assert.equal(await checked(p, 'm4'), 'false,false');
   assert.equal(await checked(p, 'm3'), 'false,false');
   assert.equal(await storedMarks(p), undefined);
   assert.equal(await p.locator('#fixwords-send').getAttribute('aria-disabled'), 'true');
+  await done(p);
+  const en = await openMarks({ marks: ['OK', 'NG'], lang: 'en' });
+  await verdicts(en, 'm1').nth(0).click();
+  await en.locator('#fixwords-reset').click();
+  en.once('dialog', async d => { message = d.message(); await d.dismiss(); });
+  await en.locator('#fixwords-reset-all').click();
+  assert.equal(message, 'Reset all your wording changes, comments and verdicts?');
+  await done(en);
+});
+test('marks: dark colour scheme reaches the verdict buttons', async () => {
+  const colours = async scheme => {
+    const p = await openMarks({ marks: ['OK', 'NG'] }, { colorScheme: scheme });
+    await verdicts(p, 'm1').nth(0).click();
+    const c = await verdicts(p, 'm1').evaluateAll(b => b.map(x => getComputedStyle(x).backgroundColor));
+    await done(p);
+    return c;
+  };
+  assert.deepEqual(await colours('light'), ['rgb(11, 110, 102)', 'rgb(255, 255, 255)']);
+  assert.deepEqual(await colours('dark'), ['rgb(53, 179, 167)', 'rgb(31, 35, 41)']);
+});
+test('marks: an id that is an Object.prototype name survives a reload', async () => {
+  const p = await openMarks({ marks: ['OK', 'NG'] });
+  await p.route('**/proto-page.html', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body:
+    require('node:fs').readFileSync('tests/fixtures/marks.html', 'utf8').replace('data-fixwords-mark="2"', 'data-fixwords-mark="__proto__"') }));
+  await p.goto(env.base + '/proto-page.html');
+  await verdicts(p, 'm2').nth(1).click();
+  await p.reload();
+  // The fixture's own meta offers OK, NG and 例外.
+  assert.equal(await checked(p, 'm2'), 'false,true,false');
   await done(p);
 });
 
