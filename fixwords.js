@@ -551,9 +551,6 @@
     pageBtn.hidden = !commenting; if (pageNote) pageBtn.setAttribute("data-noted", ""); else pageBtn.removeAttribute("data-noted");
     toggle.textContent = editing ? t("stop") : t("continue");
     toggle.setAttribute("aria-pressed", editing ? "true" : "false");
-    var sentKey = (sentMode === "shared" ? "sharedStatus" : "copiedStatus") + (m ? "Notes" : "");
-    status.textContent = !all ? t("empty") : pending ? t(m ? "pendingNotes" : "pending", { n: e, m: m }) : t(sentKey, { n: e, m: m });
-    send.textContent = m ? t("sendCountNotes", { n: e, m: m }) : t("sendCount", { n: n });
     if (choices.length) {
       var v = { k: k, all: markIds.length, n: e, m: m };
       var stats = [t("statMarks", v)];
@@ -562,6 +559,10 @@
       stats = stats.join(t("statJoin"));
       status.textContent = !all ? t("empty") : stats + t(pending ? "tailPending" : sentMode === "shared" ? "tailShared" : "tailCopied");
       send.textContent = t("sendMarks", { parts: stats });
+    } else {
+      var sentKey = (sentMode === "shared" ? "sharedStatus" : "copiedStatus") + (m ? "Notes" : "");
+      status.textContent = !n ? t("empty") : pending ? t(m ? "pendingNotes" : "pending", { n: e, m: m }) : t(sentKey, { n: e, m: m });
+      send.textContent = m ? t("sendCountNotes", { n: e, m: m }) : t("sendCount", { n: n });
     }
     status.setAttribute("data-state", !all ? "empty" : pending ? "unsent" : "sent");
     send.setAttribute("aria-disabled", !all ? "true" : "false");
