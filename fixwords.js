@@ -647,33 +647,37 @@
   // A 💬 pin just after the last character of each commented text opens its comment, in any mode.
   // It lives in the body, not in the page text, so the text and the report stay as they are.
   function placePins() {
-    var zero = null;
-    items.forEach(function (it) {
-      if (!it.note || closed) { if (it.pin) { it.pin.remove(); it.pin = null; } return; }
+    // Three passes, so a page with many comments lays out once: DOM writes, then all reads, then the positions.
+    var pinned = items.filter(function (it) {
+      if (!it.note || closed) { if (it.pin) { it.pin.remove(); it.pin = null; } return false; }
       if (!it.pin) {
         it.pin = button("💬", document.body); it.pin.className = "fixwords-note-pin";
         it.pin.addEventListener("click", function () { openNote({ item: it }); });
       }
       it.pin.setAttribute("aria-label", t("notePin", { text: cut(oneLine(text(it.node)), 20) }));
-      var end = null;
-      if (it.svg) end = it.node.getBoundingClientRect();
-      else {
-        var range = document.createRange(); range.selectNodeContents(it.node);
-        var rects = range.getClientRects(); end = rects[rects.length - 1] || null;
-      }
+      it.pin.hidden = false;
+      return true;
+    });
+    if (!pinned.length) return;
+    // Where left/top 0 puts a pin: its containing block depends on the page's own layout, and all pins share it.
+    pinned[0].pin.style.left = pinned[0].pin.style.top = "0px";
+    var zero = pinned[0].pin.getBoundingClientRect(), viewport = document.documentElement.clientWidth;
+    var ends = pinned.map(function (it) {
+      if (it.svg) return it.node.getBoundingClientRect();
+      var range = document.createRange(); range.selectNodeContents(it.node);
+      var rects = range.getClientRects(); return rects[rects.length - 1] || null;
+    });
+    pinned.forEach(function (it, i) {
+      var end = ends[i], size = 32;
       it.pin.hidden = !end || (!end.width && !end.height);
       if (it.pin.hidden) return;
-      var size = 32, viewport = document.documentElement.clientWidth;
       // With no room left on the line, the pin overlaps the end of the text instead of widening the page.
       var left = Math.max(0, Math.min(end.right + (it.svg ? 4 : 2), viewport - size - 4));
-      var top = end.top + end.height / 2 - size / 2;
-      // Measure where left/top 0 puts a pin, once: its containing block depends on the page's own layout,
-      // and all pins share it.
-      if (!zero) { it.pin.style.left = it.pin.style.top = "0px"; zero = it.pin.getBoundingClientRect(); }
       it.pin.style.left = left - zero.left + "px";
-      it.pin.style.top = top - zero.top + "px";
+      it.pin.style.top = end.top + end.height / 2 - size / 2 - zero.top + "px";
     });
   }
+
   var svgInput = null, svgItem = null;
   // Safari ends the composition before the Enter that confirmed it; that keydown carries keyCode 229.
   function composing(e) { return e.isComposing || e.keyCode === 229; }
@@ -722,7 +726,7 @@
     svgInput.addEventListener("blur", function () { finishSvg(false, false); });
     svgInput.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !composing(e)) { e.preventDefault(); finishSvg(false, true); }
-      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finishSvg(true, true); }
+      else if (e.key === "Escape" && !composing(e)) { e.preventDefault(); e.stopPropagation(); finishSvg(true, true); }
     });
     placeSvg(); svgInput.focus(); svgInput.select();
   }
@@ -754,7 +758,7 @@
     noteInput.addEventListener("keydown", function (e) {
       // Plain Enter stays a newline (it also confirms IME text); Ctrl/Cmd+Enter saves.
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !composing(e)) { e.preventDefault(); finishNote(false, true); }
-      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finishNote(true, true); }
+      else if (e.key === "Escape" && !composing(e)) { e.preventDefault(); e.stopPropagation(); finishNote(true, true); }
     });
     placeNote(); noteInput.focus();
     if (noteInput) noteInput.setSelectionRange(noteInput.value.length, noteInput.value.length);
@@ -971,7 +975,7 @@
   manual.addEventListener("click", function () { if (stale(sheetText)) hideSheet(true); else result(sheetText, "copied"); });
   dismiss.addEventListener("click", function () { hideSheet(true); });
   document.addEventListener("keydown", function (e) {
-    if (e.key !== "Escape") return;
+    if (e.key !== "Escape" || composing(e)) return;
     if (!panel.hidden) { e.preventDefault(); hideSheet(true); }
     else if (commenting) { e.preventDefault(); setCommenting(false); (bar.hidden ? handle : commentBtn).focus(); }
   });

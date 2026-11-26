@@ -649,8 +649,11 @@ for (const lang of ['en', 'ja']) {
     assert.equal(await commentToggle(p).textContent(), S.done);
     assert.equal(await commentToggle(p).evaluate(n => getComputedStyle(n).backgroundColor), 'rgb(37, 99, 235)');
     assert.equal(await p.locator('#dup1').evaluate(n => getComputedStyle(n).outlineColor), 'rgb(37, 99, 235)');
-    // Escape inside the note field cancels the note only.
+    // Escape inside the note field cancels the note only; during IME composition it does neither.
     await p.locator('#dup1').click();
+    await p.locator('#fixwords-note-input').dispatchEvent('keydown', { key: 'Escape', isComposing: true, bubbles: true });
+    assert.equal(await p.locator('#fixwords-note-input').count(), 1);
+    assert.equal(await commentToggle(p).getAttribute('aria-pressed'), 'true');
     await p.keyboard.press('Escape');
     assert.equal(await p.locator('#fixwords-note-input').count(), 0);
     assert.equal(await commentToggle(p).getAttribute('aria-pressed'), 'true');
