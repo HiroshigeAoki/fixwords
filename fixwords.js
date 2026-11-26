@@ -51,6 +51,9 @@
     "iconEdit": "✎",
     "comment": "💬 コメント",
     "pageComment": "ページ全体へのコメント",
+    "commentDone": "✓ コメントを終える",
+    "commentHint": "💬 コメントしたい文字をタップしてください",
+    "notePin": "コメントを開く：{text}",
     "noteLabel": "コメントを書く",
     "pendingNotes": "直し {n} か所・コメント {m} 件 ・ まだ送っていません",
     "sharedStatusNotes": "直し {n} か所・コメント {m} 件 ・ 共有済みです",
@@ -136,6 +139,9 @@
     "iconEdit": "✎",
     "comment": "💬 Comment",
     "pageComment": "Comment on the whole page",
+    "commentDone": "✓ Finish commenting",
+    "commentHint": "💬 Tap the words you want to comment on",
+    "notePin": "Open comment: {text}",
     "noteLabel": "Write a comment",
     "pendingNotes": "Changes: {n}, comments: {m} · Not sent yet",
     "sharedStatusNotes": "Changes: {n}, comments: {m} · Shared",
@@ -491,12 +497,16 @@
     ".fixwords-box{fill:none;stroke:#e0a200;stroke-dasharray:3 2;vector-effect:non-scaling-stroke;pointer-events:none}.fixwords-box.changed{fill:rgba(224,162,0,.16);stroke-dasharray:none}" +
     "#fixwords-svg-input{position:absolute;right:auto;bottom:auto;z-index:2147482999;font-size:16px;min-height:44px;padding:8px;border:2px solid #e0a200;border-radius:8px;margin:0}" +
     "#fixwords-note-input{display:block;position:absolute;right:auto;bottom:auto;z-index:2147482999;font-size:16px;font-weight:400;min-height:44px;padding:8px;border:2px solid #2563eb;border-radius:8px;margin:0;resize:none;overflow:auto}" +
-    "[data-fixwords-noted]{text-decoration:underline dotted #2563eb 2px;text-underline-offset:4px}.fixwords-box.noted{stroke:#2563eb;stroke-dasharray:1 3;stroke-linecap:round}#fixwords-bar #fixwords-pagenote[data-noted]{box-shadow:inset 0 -3px 0 #2563eb}#fixwords-bar #fixwords-comment[aria-pressed=true]{box-shadow:inset 0 0 0 2px #2563eb}" +
+    "[data-fixwords-noted]{text-decoration:underline dotted #2563eb 2px;text-underline-offset:4px}.fixwords-box.noted{stroke:#2563eb;stroke-dasharray:1 3;stroke-linecap:round}#fixwords-bar #fixwords-pagenote[data-noted]{box-shadow:inset 0 -3px 0 #2563eb}#fixwords-bar #fixwords-comment[aria-pressed=true]{background:#2563eb;color:#fff;font-weight:600}" +
+    "#fixwords-mode{margin:4px 0 10px;padding:10px 12px;border-radius:10px;background:rgba(37,99,235,.1);color:#1e40af;font-weight:600}@media(prefers-color-scheme:dark){#fixwords-mode{background:rgba(96,165,250,.16);color:#bfdbfe}}" +
+    "body.fixwords-commenting [data-fixwords-editable]{outline-color:#2563eb}body.fixwords-commenting .fixwords-box:not(.changed){stroke:#2563eb}" +
+    ".fixwords-note-pin{position:absolute;z-index:2147482998;box-sizing:border-box;width:32px;height:32px;margin:0;padding:0;border:0;border-radius:50%;background:#2563eb;color:#fff;font:15px/32px sans-serif;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}" +
+    ".fixwords-note-pin:focus-visible{outline:3px solid #2563eb;outline-offset:2px}" +
     ".fixwords-marks{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0;padding:0;border:0;background:none;font:500 15px/1.3 'Hiragino Sans','Yu Gothic','Noto Sans CJK JP',sans-serif;text-align:left}" +
     ".fixwords-marks button[role=radio]{box-sizing:border-box;display:inline-block;width:auto;min-width:48px;min-height:32px;margin:0;padding:4px 14px;font:inherit;line-height:1.3;letter-spacing:normal;text-transform:none;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--edge);border-radius:999px;box-shadow:none;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}" +
     ".fixwords-marks button[role=radio][aria-checked=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}.fixwords-marks button[role=radio]:focus-visible{outline:3px solid var(--accent);outline-offset:2px}" +
     "@media(pointer:coarse){.fixwords-marks button[role=radio]{min-height:44px;min-width:56px}}" +
-    "@media print{.fixwords-box,#fixwords-svg-input,#fixwords-note-input{display:none!important}}" +
+    "@media print{.fixwords-box,.fixwords-note-pin,#fixwords-svg-input,#fixwords-note-input{display:none!important}}" +
     "@media(prefers-reduced-motion:reduce){#fixwords-bar,#fixwords-panel,#fixwords-bar button,#fixwords-panel button,#fixwords-handle,#fixwords-status{transition:none}}";
   document.head.appendChild(css);
   function element(tag, id, parent, label) {
@@ -511,6 +521,7 @@
   var hide = button(t("hide"), header, "hide");
   var close = button(t("iconClose"), header, "close"); close.setAttribute("aria-label", t("close"));
   var content = element("div", "content", bar);
+  var modeHint = element("div", "mode", content, t("commentHint"));
   var guide = element("div", "guide", content);
   element("div", "", guide, t("stepOne"));
   element("div", "", guide, destination ? t("stepDestination") + destination : t("stepTwo"));
@@ -576,7 +587,8 @@
     bar.hidden = closed || tucked; handle.hidden = !bar.hidden; hide.hidden = idle;
     if (idle) bar.setAttribute("data-idle", ""); else bar.removeAttribute("data-idle");
     start.textContent = idle ? t("startIdle") : t("start");
-    content.hidden = idle; guide.hidden = !editing || all > 0; reset.hidden = !all;
+    content.hidden = idle; guide.hidden = !editing || all > 0 || commenting; reset.hidden = !all;
+    modeHint.hidden = !commenting; commentBtn.textContent = t(commenting ? "commentDone" : "comment");
     commentBtn.hidden = idle; commentBtn.setAttribute("aria-pressed", commenting ? "true" : "false");
     pageBtn.hidden = !commenting; if (pageNote) pageBtn.setAttribute("data-noted", ""); else pageBtn.removeAttribute("data-noted");
     toggle.textContent = editing ? t("stop") : t("continue");
@@ -630,7 +642,42 @@
       if (changed) it.node.setAttribute("data-fixwords-changed", "");
       else it.node.removeAttribute("data-fixwords-changed");
     });
+    placePins();
   }
+  // A 💬 pin just after the last character of each commented text opens its comment, in any mode.
+  // It lives in the body, not in the page text, so the text and the report stay as they are.
+  function placePins() {
+    // Three passes, so a page with many comments lays out once: DOM writes, then all reads, then the positions.
+    var pinned = items.filter(function (it) {
+      if (!it.note || closed) { if (it.pin) { it.pin.remove(); it.pin = null; } return false; }
+      if (!it.pin) {
+        it.pin = button("💬", document.body); it.pin.className = "fixwords-note-pin";
+        it.pin.addEventListener("click", function () { openNote({ item: it }); });
+      }
+      it.pin.setAttribute("aria-label", t("notePin", { text: cut(oneLine(text(it.node)), 20) }));
+      it.pin.hidden = false;
+      return true;
+    });
+    if (!pinned.length) return;
+    // Where left/top 0 puts a pin: its containing block depends on the page's own layout, and all pins share it.
+    pinned[0].pin.style.left = pinned[0].pin.style.top = "0px";
+    var zero = pinned[0].pin.getBoundingClientRect(), viewport = document.documentElement.clientWidth;
+    var ends = pinned.map(function (it) {
+      if (it.svg) return it.node.getBoundingClientRect();
+      var range = document.createRange(); range.selectNodeContents(it.node);
+      var rects = range.getClientRects(); return rects[rects.length - 1] || null;
+    });
+    pinned.forEach(function (it, i) {
+      var end = ends[i], size = 32;
+      it.pin.hidden = !end || (!end.width && !end.height);
+      if (it.pin.hidden) return;
+      // With no room left on the line, the pin overlaps the end of the text instead of widening the page.
+      var left = Math.max(0, Math.min(end.right + (it.svg ? 4 : 2), viewport - size - 4));
+      it.pin.style.left = left - zero.left + "px";
+      it.pin.style.top = end.top + end.height / 2 - size / 2 - zero.top + "px";
+    });
+  }
+
   var svgInput = null, svgItem = null;
   // Safari ends the composition before the Enter that confirmed it; that keydown carries keyCode 229.
   function composing(e) { return e.isComposing || e.keyCode === 229; }
@@ -679,7 +726,7 @@
     svgInput.addEventListener("blur", function () { finishSvg(false, false); });
     svgInput.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !composing(e)) { e.preventDefault(); finishSvg(false, true); }
-      else if (e.key === "Escape") { e.preventDefault(); finishSvg(true, true); }
+      else if (e.key === "Escape" && !composing(e)) { e.preventDefault(); e.stopPropagation(); finishSvg(true, true); }
     });
     placeSvg(); svgInput.focus(); svgInput.select();
   }
@@ -700,7 +747,7 @@
     input.remove();
     if (!cancel) { if (target.page) pageNote = value; else target.item.note = value; }
     hideSheet(); persist(); mark();
-    if (focus) (target.page ? pageBtn : target.item.node).focus();
+    if (focus) (target.page ? pageBtn : commenting || !target.item.pin || target.item.pin.hidden ? target.item.node : target.item.pin).focus();
   }
   function openNote(target) {
     finishNote(false, false); hideSheet();
@@ -711,7 +758,7 @@
     noteInput.addEventListener("keydown", function (e) {
       // Plain Enter stays a newline (it also confirms IME text); Ctrl/Cmd+Enter saves.
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !composing(e)) { e.preventDefault(); finishNote(false, true); }
-      else if (e.key === "Escape") { e.preventDefault(); finishNote(true, true); }
+      else if (e.key === "Escape" && !composing(e)) { e.preventDefault(); e.stopPropagation(); finishNote(true, true); }
     });
     placeNote(); noteInput.focus();
     if (noteInput) noteInput.setSelectionRange(noteInput.value.length, noteInput.value.length);
@@ -928,12 +975,14 @@
   manual.addEventListener("click", function () { if (stale(sheetText)) hideSheet(true); else result(sheetText, "copied"); });
   dismiss.addEventListener("click", function () { hideSheet(true); });
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && !panel.hidden) { e.preventDefault(); hideSheet(true); }
+    if (e.key !== "Escape" || composing(e)) return;
+    if (!panel.hidden) { e.preventDefault(); hideSheet(true); }
+    else if (commenting) { e.preventDefault(); setCommenting(false); (bar.hidden ? handle : commentBtn).focus(); }
   });
   function setClosed(on) {
     closed = on; tucked = false;
     if (on) { setEditing(false); hideSheet(); }
-    persist();
+    placePins(); persist();
   }
   close.addEventListener("click", function () { setClosed(true); });
   hide.addEventListener("click", function () { tucked = true; hideSheet(); handle.focus(); });
@@ -953,8 +1002,10 @@
     sent = ""; hideSheet(true); persist(); mark();
   });
   window.addEventListener("beforeunload", function (e) { if (unsent()) { e.preventDefault(); e.returnValue = ""; } });
-  window.addEventListener("resize", function () { layout(); placeSvg(); placeNote(); });
-  if (typeof ResizeObserver !== "undefined") new ResizeObserver(layout).observe(bar);
+  window.addEventListener("resize", function () { layout(); placeSvg(); placeNote(); placePins(); });
+  window.addEventListener("load", placePins);
+  if (typeof ResizeObserver !== "undefined") { new ResizeObserver(layout).observe(bar); new ResizeObserver(placePins).observe(document.body); }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(placePins);
   setEditing(false);
   setClosed(closed);
   }
