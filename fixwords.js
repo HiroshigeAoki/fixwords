@@ -65,7 +65,7 @@
     "rowUndo": "元に戻す",
     "restore": "取り消す",
     "resetAll": "すべて元に戻す",
-    "noList": "直した箇所はありません",
+    "listEmpty": "文言はすべて元どおりです",
     "locFigure": "図の文字",
     "locHeading": "見出し「{heading}」の下",
     "locOccurrence": "{index}か所目／全{total}か所",
@@ -151,7 +151,7 @@
     "rowUndo": "Undo",
     "restore": "Restore",
     "resetAll": "Undo all",
-    "noList": "No changes yet",
+    "listEmpty": "All wording is back to the original",
     "locFigure": "Figure text",
     "locHeading": "Under “{heading}”",
     "locOccurrence": "occurrence {index} of {total}",
@@ -484,7 +484,7 @@
     "#fixwords-panel textarea{box-sizing:border-box;display:block;width:100%;font:400 16px/1.5 'Hiragino Sans','Yu Gothic','Noto Sans CJK JP',sans-serif;margin:12px 0;padding:8px;border:1px solid var(--edge);border-radius:8px;background:var(--surface);color:var(--ink);resize:vertical;overflow:auto}" +
     "#fixwords-list-top{position:sticky;top:-12px;z-index:1;margin-top:-12px;padding:12px 0 8px;background:var(--surface)}#fixwords-list-header{display:flex;align-items:center;justify-content:space-between;gap:8px}#fixwords-list-title{font-weight:600;min-width:0}" +
     "#fixwords-panel .fixwords-row{border-top:1px solid var(--edge);padding:12px 0;overflow-wrap:anywhere}#fixwords-panel .fixwords-location{color:var(--muted);font-size:13px}#fixwords-panel .fixwords-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere;margin:6px 0}#fixwords-panel del{color:var(--muted);text-decoration:line-through}#fixwords-panel .fixwords-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}" +
-    "#fixwords-panel .fixwords-row button{border:1px solid var(--edge)}#fixwords-notice{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border-radius:10px;background:rgba(127,127,127,.12);overflow-wrap:anywhere}#fixwords-notice-text{flex:1;min-width:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}#fixwords-panel #fixwords-undo{flex:none;border:1px solid var(--accent);color:var(--accent)}#fixwords-panel #fixwords-reset-all{color:var(--danger)}" +
+    "#fixwords-panel .fixwords-row button{border:1px solid var(--edge)}#fixwords-notice{display:flex;align-items:center;justify-content:space-between;gap:8px;overflow-wrap:anywhere}#fixwords-notice-text:before{content:'✓ ';color:var(--accent);font-weight:600}#fixwords-notice-text{flex:1;min-width:0;word-break:auto-phrase;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}#fixwords-panel #fixwords-undo{flex:none;border:1px solid var(--accent);color:var(--accent)}#fixwords-panel #fixwords-list-done{width:100%;min-height:48px;margin-top:8px;background:var(--accent);color:var(--accent-ink);font-weight:600}#fixwords-panel #fixwords-reset-all{color:var(--danger)}" +
     "body.fixwords-editing [data-fixwords-editable]{outline:1px dashed #e0a200;outline-offset:3px}body.fixwords-editing [data-fixwords-editable]:focus{outline:2px solid #e0a200;background:rgba(224,162,0,.14)}body.fixwords-editing [data-fixwords-changed]{box-shadow:inset 0 -3px 0 #e0a200}body.fixwords-show-changes [data-fixwords-changed]{background:rgba(255,214,10,.55);outline:2px solid #e0a200;outline-offset:2px;color:#000}" +
     ".fixwords-marks{--surface:#fff;--ink:#191d22;--edge:rgba(25,29,34,.24);--accent:#0b6e66;--accent-ink:#fff}" +
     "@media(prefers-color-scheme:dark){.fixwords-marks,#fixwords-svg-input,#fixwords-note-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#1f2329;--ink:#f2f4f6;--edge:rgba(242,244,246,.3);--accent:#35b3a7;--accent-ink:#191d22;--amber:#fbbf24;--danger:#f97066;--muted:#bdc4cd}}" +
@@ -551,6 +551,8 @@
   var undo = button(t("restore"), notice, "undo");
   var rows = element("div", "", listView);
   var resetAll = button(t("resetAll"), listView, "reset-all");
+  // Shown instead of the rows once no changed text is left.
+  var listDone = button(t("close"), listView, "list-done");
   var undoSlot = null, revertedAt = 0;
   var spacer = element("div", "spacer"), room = 0; spacer.setAttribute("aria-hidden", "true");
   function reveal(node) {
@@ -795,7 +797,10 @@
     rows.textContent = "";
     var changed = changes(), buttons = [];
     resetAll.hidden = !total();
-    if (!changed.length) element("div", "", rows, t("noList"));
+    listDone.hidden = !!changed.length;
+    listTitle.textContent = t(changed.length ? "listTitle" : "listEmpty");
+    // Focus lands on Restore, so the new title reaches screen readers through the live region.
+    if (!changed.length && undoSlot) live.textContent = noticeText.textContent + t("destinationEnd") + " " + t("listEmpty");
     changed.forEach(function (it, i) {
       var row = element("div", "", rows); row.className = "fixwords-row";
       var loc = locationLabel(it);
@@ -822,6 +827,7 @@
   }
   function showList() { revertedAt = 0; openPanel(listView, t("listLabel")); rebuildList(); }
   listClose.addEventListener("click", function () { hideSheet(true); });
+  listDone.addEventListener("click", function () { hideSheet(true); });
   undo.addEventListener("click", function () {
     var slot = undoSlot;
     if (!slot) return;

@@ -51,7 +51,9 @@ Working with a coding agent? Ask it:
    (Ctrl/Cmd+Enter or tapping elsewhere saves). **Comment on the whole page** adds a note that belongs to no text.
    Commented text gets a dotted underline.
 4. To take back a change, press **Reset changes**. It opens a list of the changed texts; **Undo** on a row reverts
-   just that text, and **Restore** in the notice brings the last one back until the list is closed. **Undo all**
+   just that text, and **Restore** in the notice brings the last one back until the list is closed. Once no
+   changed text is left, the list title reads "All wording is back to the original" and a **Close** button
+   appears. **Undo all**
    reverts every change and deletes every comment after a confirmation. To remove a comment, empty its box.
 5. Press **Send your changes**. On a touch device (phone, tablet) the share sheet opens; on a computer the list
    is copied to the clipboard. Paste it into a chat or an email to the author.
