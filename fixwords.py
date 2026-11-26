@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Inline fixwords into UTF-8 HTML files and update their CSP meta tags."""
 import argparse
-import json
-import difflib
-from datetime import datetime, timezone
 import base64
+import difflib
 import hashlib
+import json
+from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 import re
 import os
+import shlex
 import stat
 import tempfile
 import sys
@@ -394,13 +395,9 @@ def aggregate(rows):
     return pairs
 
 
-def decision_map(decisions):
-    return {(row['b'], row['a']): row['decision'] for row in decisions}
-
-
 def eligible(pair, info, decisions):
     b, a = pair
-    return (bool(b) and not re.search(re.escape(b), a)
+    return (bool(b) and b not in a
             and not info.get('p') and any(script_class(c) != 'other' for c in b + a)
             and decisions.get(pair) != 'reject'
             and (decisions.get(pair) == 'accept' or (info['count'] >= 3 and len(info['docs']) >= 2)))
@@ -408,7 +405,7 @@ def eligible(pair, info, decisions):
 
 def promoted_pairs(rows, decisions):
     pairs = aggregate(rows)
-    choices = decision_map(decisions)
+    choices = {(row['b'], row['a']): row['decision'] for row in decisions}
     for pair, choice in choices.items():
         if choice == 'accept':
             pairs.setdefault(pair, dict(count=0, docs=set(), first='', ctx='', p=False))
@@ -416,7 +413,6 @@ def promoted_pairs(rows, decisions):
 
 
 def pair_commands(pair):
-    import shlex
     argument = shlex.quote('='.join(pair))
     return f'python3 fixwords.py accept {argument}', f'python3 fixwords.py reject {argument}'
 
