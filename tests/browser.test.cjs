@@ -687,4 +687,215 @@ test('revert one: opening a comment or label closes the list, bar button hidden 
   await done(p);
 });
 
+// Verdict marks: a page opts in with {"marks":[...]} and data-fixwords-mark items.
+async function openMarks(config, options = {}) {
+  const context = await env.browser.newContext(options);
+  const page = await context.newPage();
+  page.errors = problems(page);
+  page.markConfig = config;
+  await page.route('**/marks-page.html', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body:
+    require('node:fs').readFileSync('tests/fixtures/marks.html', 'utf8').replace(/<meta name="fixwords"[^>]*>/,
+      page.markConfig === null ? '' : '<meta name="fixwords" content=\'' + JSON.stringify(page.markConfig) + '\'>') }));
+  await page.goto(env.base + '/marks-page.html');
+  return page;
+}
+const verdicts = (p, id) => p.locator('#' + id + ' .fixwords-marks button');
+const checked = async (p, id) => (await verdicts(p, id).evaluateAll(b => b.map(x => x.getAttribute('aria-checked')))).join(',');
+const storedMarks = p => p.evaluate(() => (JSON.parse(localStorage.getItem('fixwords:' + location.pathname)) || {}).marks);
+test('marks: one radio group per item with the configured labels; invalid config adds none', async () => {
+  const p = await openMarks({ marks: ['OK', 'NG', '例外'] });
+  assert.equal(await p.locator('.fixwords-marks').count(), 4);
+  assert.deepEqual(await verdicts(p, 'm1').allTextContents(), ['OK', 'NG', '例外']);
+  assert.equal(await p.locator('#m1 .fixwords-marks').getAttribute('role'), 'radiogroup');
+  assert.equal(await p.locator('#m1 .fixwords-marks').getAttribute('aria-label'), '1');
+  assert.equal(await p.locator('#m3 .fixwords-marks').getAttribute('aria-label'), '3');
+  assert.deepEqual(await verdicts(p, 'm1').evaluateAll(b => b.map(x => [x.type, x.getAttribute('role'), x.getAttribute('aria-checked')])),
+    [['button', 'radio', 'false'], ['button', 'radio', 'false'], ['button', 'radio', 'false']]);
+  assert.equal(await p.locator('#fixwords-bar').getAttribute('data-idle'), '');
+  await done(p);
+  const clean = await openMarks({ marks: [' OK ', 'OK', 'NG', 'この選択肢は十二文字を超えています', 7, '  '] });
+  assert.deepEqual(await verdicts(clean, 'm1').allTextContents(), ['OK', 'NG']);
+  await done(clean);
+  for (const marks of [['a', 'b', 'c', 'd', 'e', 'f', 'g'], 'OK', [], ['', '  ', 3], { OK: 1 }, null]) {
+    const q = await openMarks({ marks });
+    assert.equal(await q.locator('.fixwords-marks').count(), 0);
+    assert.equal(await q.locator('#m1 > span:first-child').count(), 0);
+    await done(q);
+  }
+  const six = await openMarks({ marks: ['a', 'b', 'c', 'd', 'e', 'f'] });
+  assert.equal(await verdicts(six, 'm1').count(), 6);
+  await done(six);
+  const none = await openMarks(null);
+  assert.equal(await none.locator('.fixwords-marks').count(), 0);
+  await done(none);
+});
+test('marks: click selects, a second click clears, duplicate ids stay in sync', async () => {
+  const p = await openMarks({ marks: ['OK', 'NG', '例外'] });
+  await verdicts(p, 'm1').nth(0).click();
+  assert.equal(await checked(p, 'm1'), 'true,false,false');
+  assert.equal(await checked(p, 'm4'), 'true,false,false');
+  await verdicts(p, 'm4').nth(1).click();
+  assert.equal(await checked(p, 'm1'), 'false,true,false');
+  assert.equal(await checked(p, 'm4'), 'false,true,false');
+  assert.equal(await checked(p, 'm2'), 'false,false,false');
+  assert.deepEqual(await storedMarks(p), { 1: 'NG' });
+  await verdicts(p, 'm1').nth(1).click();
+  assert.equal(await checked(p, 'm4'), 'false,false,false');
+  assert.equal(await storedMarks(p), undefined);
+  await verdicts(p, 'm3').nth(2).click();
+  assert.deepEqual(await storedMarks(p), { 3: '例外' });
+  assert.equal((await p.evaluate(() => JSON.parse(localStorage.getItem('fixwords:' + location.pathname)).v)), 1);
+  await done(p);
+});
+test('marks: verdicts survive a reload; a verdict whose choice left the meta is dropped', async () => {
+  const p = await openMarks({ marks: ['OK', 'NG', '例外'] });
+  await verdicts(p, 'm1').nth(0).click();
+  await verdicts(p, 'm2').nth(2).click();
+  await p.reload();
+  assert.equal(await checked(p, 'm1'), 'true,false,false');
+  assert.equal(await checked(p, 'm2'), 'false,false,true');
+  assert.equal(await p.locator('#fixwords-bar').getAttribute('data-idle'), null);
+  p.markConfig = { marks: ['OK', 'NG'] };
+  await p.reload();
+  assert.equal(await checked(p, 'm1'), 'true,false');
+  assert.equal(await verdicts(p, 'm2').count(), 2);
+  assert.equal(await checked(p, 'm2'), 'false,false');
+  await verdicts(p, 'm3').nth(0).click();
+  assert.deepEqual(await storedMarks(p), { 1: 'OK', 3: 'OK' });
+  assert.equal(new URL(p.url()).search + new URL(p.url()).hash, '');
+  await done(p);
+});
+test('marks: report lists verdicts grouped in config order before edits, in ja and en', async () => {
+  for (const lang of ['ja', 'en']) {
+    const p = await openMarks(lang === 'ja' ? { marks: ['OK', 'NG', '例外'] } : { lang: 'en', title: 'Acceptance', marks: ['OK', 'NG', 'Hold'] },
+      { permissions: ['clipboard-read', 'clipboard-write'] });
+    await verdicts(p, 'm2').nth(1).click();
+    await verdicts(p, 'm1').nth(0).click();
+    await start(p);
+    await edit(p, '#m3 > span:first-child', lang === 'ja' ? 'メールが即時に届く' : 'Mail arrives');
+    await p.locator('#fixwords-send').click();
+    const report = await p.evaluate(() => navigator.clipboard.readText());
+    assert.equal(report, lang === 'ja'
+      ? '受け入れ確認 文言の直し\n\n判定（3件中 2件）\nOK：1\nNG：2\n未判定：3\n\n1. 元：メールが届く\n   新：メールが即時に届く'
+      : 'Acceptance — Wording changes\n\nVerdicts (2 of 3)\nOK: 1\nNG: 2\nUnmarked: 3\n\n1. Before: メールが届く\n   After: Mail arrives');
+    await done(p);
+  }
+  const q = await openMarks({ marks: ['OK', 'NG', '例外'] }, { permissions: ['clipboard-read', 'clipboard-write'] });
+  for (const [id, i] of [['m1', 0], ['m2', 0], ['m3', 2]]) await verdicts(q, id).nth(i).click();
+  await q.locator('#fixwords-send').click();
+  assert.equal(await q.evaluate(() => navigator.clipboard.readText()), '受け入れ確認 文言の直し\n\n判定（3件中 3件）\nOK：1, 2\n例外：3');
+  await done(q);
+});
+test('marks: bar status and send button count verdicts, edits and comments', async () => {
+  for (const lang of ['ja', 'en']) {
+    const p = await openMarks({ lang, marks: ['OK', 'NG'] }, { permissions: ['clipboard-read', 'clipboard-write'] });
+    const ja = lang === 'ja';
+    assert.equal(await p.locator('#fixwords-send').getAttribute('aria-disabled'), 'true');
+    await verdicts(p, 'm1').nth(0).click();
+    assert.equal(await p.locator('#fixwords-send').getAttribute('aria-disabled'), 'false');
+    assert.equal(await p.locator('#fixwords-status').textContent(), ja ? '判定 1/3 ・ まだ送っていません' : 'Verdicts 1/3 · Not sent yet');
+    assert.equal(await p.locator('#fixwords-send').textContent(), ja ? '結果を送る（判定 1/3）' : 'Send results (Verdicts 1/3)');
+    await start(p);
+    await edit(p, '#m3 > span:first-child', 'Mail');
+    assert.equal(await p.locator('#fixwords-status').textContent(), ja ? '判定 1/3・直し 1 か所 ・ まだ送っていません' : 'Verdicts 1/3, changes: 1 · Not sent yet');
+    assert.equal(await p.locator('#fixwords-send').textContent(), ja ? '結果を送る（判定 1/3・直し 1 か所）' : 'Send results (Verdicts 1/3, changes: 1)');
+    await p.locator('#fixwords-comment').click();
+    await p.locator('#m1 > span:first-child').click();
+    await p.locator('#fixwords-note-input').fill('Why?'); await p.keyboard.press('Control+Enter');
+    assert.equal(await p.locator('#fixwords-send').textContent(), ja ? '結果を送る（判定 1/3・直し 1 か所・コメント 1 件）' : 'Send results (Verdicts 1/3, changes: 1, comments: 1)');
+    await p.locator('#fixwords-send').click();
+    await p.locator('#fixwords-panel').waitFor();
+    assert.equal(await p.locator('#fixwords-status').textContent(), ja ? '判定 1/3・直し 1 か所・コメント 1 件 ・ 送る文章はコピー済みです' : 'Verdicts 1/3, changes: 1, comments: 1 · Copied');
+    await done(p);
+  }
+});
+test('marks: an item with its own text stays editable and keeps its buttons after the edit', async () => {
+  const p = await openMarks({ marks: ['OK', 'NG'] }, { permissions: ['clipboard-read', 'clipboard-write'] });
+  assert.equal(await p.locator('#m1 > span:first-child').first().textContent(), 'ログインできる');
+  assert.equal(await p.locator('#m1').evaluate(n => n.firstElementChild.nextElementSibling.className), 'fixwords-marks');
+  await start(p);
+  assert.equal(await p.locator('#m1 > span:first-child').first().getAttribute('contenteditable'), 'plaintext-only');
+  assert.equal(await p.locator('#m2a').getAttribute('contenteditable'), 'plaintext-only');
+  assert.equal(await p.locator('#m2 > span').count(), 1);
+  await edit(p, '#m1 > span:first-child', 'ログインに成功する');
+  assert.equal(await verdicts(p, 'm1').count(), 2);
+  await verdicts(p, 'm1').nth(1).click();
+  await edit(p, '#m2a', '決済');
+  assert.equal(await verdicts(p, 'm2').count(), 2);
+  await p.locator('#fixwords-send').click();
+  assert.equal(await p.evaluate(() => navigator.clipboard.readText()),
+    '受け入れ確認 文言の直し\n\n判定（3件中 1件）\nNG：1\n未判定：2, 3\n\n1. 元：ログインできる\n   新：ログインに成功する\n\n2. 元：支払い\n   新：決済');
+  await p.reload();
+  assert.equal(await p.locator('#m1 > span:first-child').first().textContent(), 'ログインに成功する');
+  assert.equal(await checked(p, 'm1'), 'false,true');
+  await done(p);
+});
+test('marks: buttons are never editable and never open a comment field', async () => {
+  const p = await openMarks({ marks: ['OK', 'NG'] });
+  await start(p);
+  assert.equal(await p.locator('.fixwords-marks [contenteditable], .fixwords-marks[contenteditable], [data-fixwords-editable] .fixwords-marks').count(), 0);
+  await verdicts(p, 'm1').nth(0).click();
+  assert.equal(await p.locator('#fixwords-note-input').count(), 0);
+  assert.equal(await checked(p, 'm1'), 'true,false');
+  await p.locator('#fixwords-comment').click();
+  assert.equal(await p.locator('.fixwords-marks [tabindex="0"][role="button"], .fixwords-marks[role="button"]').count(), 0);
+  await verdicts(p, 'm1').nth(1).click();
+  assert.equal(await p.locator('#fixwords-note-input').count(), 0);
+  assert.equal(await checked(p, 'm1'), 'false,true');
+  await verdicts(p, 'm3').nth(0).focus();
+  await p.keyboard.press('Enter');
+  assert.equal(await p.locator('#fixwords-note-input').count(), 0);
+  assert.equal(await checked(p, 'm3'), 'true,false');
+  await p.locator('#m1 > span:first-child').click();
+  assert.equal(await p.locator('#fixwords-note-input').count(), 1);
+  await p.keyboard.press('Escape');
+  assert.equal(await p.locator('[data-fixwords-noted]').count(), 0);
+  await done(p);
+});
+test('marks: undo all clears verdicts too', async () => {
+  const p = await openMarks({ marks: ['OK', 'NG'] });
+  await verdicts(p, 'm1').nth(0).click();
+  await verdicts(p, 'm3').nth(1).click();
+  await p.locator('#fixwords-reset').click();
+  let message = '';
+  p.once('dialog', async d => { message = d.message(); await d.accept(); });
+  await p.locator('#fixwords-reset-all').click();
+  assert.equal(message, '直した文言とコメント、判定をすべて元に戻します。よろしいですか？');
+  assert.equal(await checked(p, 'm1'), 'false,false');
+  assert.equal(await checked(p, 'm4'), 'false,false');
+  assert.equal(await checked(p, 'm3'), 'false,false');
+  assert.equal(await storedMarks(p), undefined);
+  assert.equal(await p.locator('#fixwords-send').getAttribute('aria-disabled'), 'true');
+  await done(p);
+  const en = await openMarks({ marks: ['OK', 'NG'], lang: 'en' });
+  await verdicts(en, 'm1').nth(0).click();
+  await en.locator('#fixwords-reset').click();
+  en.once('dialog', async d => { message = d.message(); await d.dismiss(); });
+  await en.locator('#fixwords-reset-all').click();
+  assert.equal(message, 'Reset all your wording changes, comments and verdicts?');
+  await done(en);
+});
+test('marks: dark colour scheme reaches the verdict buttons', async () => {
+  const colours = async scheme => {
+    const p = await openMarks({ marks: ['OK', 'NG'] }, { colorScheme: scheme });
+    await verdicts(p, 'm1').nth(0).click();
+    const c = await verdicts(p, 'm1').evaluateAll(b => b.map(x => getComputedStyle(x).backgroundColor));
+    await done(p);
+    return c;
+  };
+  assert.deepEqual(await colours('light'), ['rgb(11, 110, 102)', 'rgb(255, 255, 255)']);
+  assert.deepEqual(await colours('dark'), ['rgb(53, 179, 167)', 'rgb(31, 35, 41)']);
+});
+test('marks: an id that is an Object.prototype name survives a reload', async () => {
+  const p = await openMarks({ marks: ['OK', 'NG'] });
+  await p.route('**/proto-page.html', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body:
+    require('node:fs').readFileSync('tests/fixtures/marks.html', 'utf8').replace('data-fixwords-mark="2"', 'data-fixwords-mark="__proto__"') }));
+  await p.goto(env.base + '/proto-page.html');
+  await verdicts(p, 'm2').nth(1).click();
+  await p.reload();
+  // The fixture's own meta offers OK, NG and 例外.
+  assert.equal(await checked(p, 'm2'), 'false,true,false');
+  await done(p);
+});
+
 });
