@@ -75,7 +75,20 @@
     "emptied": "（空）",
     "rowLabel": "「{text}」を元に戻す{where}",
     "rowLabelEmpty": "空にした「{text}」を元に戻す{where}",
-    "whereWrap": "（{where}）"
+    "whereWrap": "（{where}）",
+    "partMarks": "判定 {k}/{all}",
+    "partEdits": "直し {n} か所",
+    "partNotes": "コメント {m} 件",
+    "marksHead": "判定（{total}件中 {n}件）",
+    "unmarked": "未判定",
+    "statMarks": "判定 {k}/{all}",
+    "statEdits": "直し {n} か所",
+    "statNotes": "コメント {m} 件",
+    "statJoin": "・",
+    "tailPending": " ・ まだ送っていません",
+    "tailShared": " ・ 共有済みです",
+    "tailCopied": " ・ 送る文章はコピー済みです",
+    "sendMarks": "結果を送る（{parts}）"
   },
   "en": {
     "startIdle": "✎ Fix wording",
@@ -149,7 +162,20 @@
     "emptied": "(empty)",
     "rowLabel": "Undo “{text}”{where}",
     "rowLabelEmpty": "Undo the emptied “{text}”{where}",
-    "whereWrap": " ({where})"
+    "whereWrap": " ({where})",
+    "marksHead": "Verdicts ({n} of {total})",
+    "unmarked": "Unmarked",
+    "statMarks": "Verdicts {k}/{all}",
+    "statEdits": "changes {n}",
+    "statNotes": "comments {m}",
+    "statJoin": ", ",
+    "tailPending": " · Not sent yet",
+    "tailShared": " · Shared",
+    "tailCopied": " · Copied",
+    "sendMarks": "Send results ({parts})",
+    "partMarks": "verdicts {k}/{all}",
+    "partEdits": "{n} changes",
+    "partNotes": "{m} comments"
   }
 };
   function boot() {
@@ -171,7 +197,7 @@
     });
   }
   var KEY = "fixwords:" + location.pathname;
-  var SKIP = "script, style, noscript, textarea, select, #fixwords-bar, #fixwords-panel, #fixwords-handle, #fixwords-svg-input, #fixwords-note-input, #fixwords-pagenote, [data-no-edit]";
+  var SKIP = "script, style, noscript, textarea, select, #fixwords-bar, #fixwords-panel, #fixwords-handle, #fixwords-svg-input, #fixwords-note-input, #fixwords-pagenote, [data-no-edit], .fixwords-marks";
   if (typeof config.skip === "string" && config.skip.trim()) {
     try {
       document.querySelector(config.skip);
@@ -180,6 +206,16 @@
   }
   var title = typeof config.title === "string" ? config.title : document.title || location.pathname;
   var genre = typeof config.genre === "string" ? config.genre.replace(/\s+/g, " ").trim().slice(0, 40) : "";
+  // Verdict choices: 1 to 6 distinct labels of up to 12 characters, or the feature stays off.
+  var choices = [];
+  if (Array.isArray(config.marks)) {
+    config.marks.forEach(function (c) {
+      if (typeof c !== "string") return;
+      c = c.replace(/\s+/g, " ").trim();
+      if (c && c.length <= 12 && choices.indexOf(c) < 0) choices.push(c);
+    });
+  }
+  if (choices.length > 6) choices = [];
   var saved = null;
   try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { /* Storage is optional. */ }
   // Closed: the bar is folded into a small handle so it does not cover the page.
@@ -228,6 +264,39 @@
     return (node.localName === "text" || (node.localName === "tspan" && node.closest("text"))) &&
       !node.closest("defs,symbol,clipPath,mask,pattern,marker") &&
       !Array.prototype.some.call(node.childNodes, function (c) { return c.nodeType !== 3; });
+  }
+
+  // Items that take a verdict. Own text is wrapped first so that it stays an editable leaf and the buttons survive write().
+  var markItems = [], markIds = [], marks = Object.create(null);
+  if (choices.length) {
+    Array.prototype.forEach.call(document.body.querySelectorAll("[data-fixwords-mark]"), function (node) {
+      if (node.closest("#fixwords-bar, #fixwords-panel, #fixwords-handle")) return;
+      var id = node.getAttribute("data-fixwords-mark").trim() || String(markItems.length + 1);
+      var ownText = Array.prototype.some.call(node.childNodes, function (c) { return c.nodeType === 3 && c.data.trim(); });
+      if (ownText) {
+        var wrap = document.createElement("span");
+        while (node.firstChild) wrap.appendChild(node.firstChild);
+        node.appendChild(wrap);
+      }
+      var group = document.createElement("span");
+      group.className = "fixwords-marks";
+      group.setAttribute("role", "radiogroup"); group.setAttribute("aria-label", id); group.setAttribute("data-no-edit", "");
+      var buttons = choices.map(function (choice) {
+        var b = document.createElement("button");
+        b.type = "button"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", "false");
+        b.textContent = choice; group.appendChild(b);
+        b.addEventListener("click", function () { setMark(id, marks[id] === choice ? "" : choice); });
+        return b;
+      });
+      node.appendChild(group);
+      markItems.push({ id: id, buttons: buttons });
+      if (markIds.indexOf(id) < 0) markIds.push(id);
+    });
+  }
+  function paintMarks() {
+    markItems.forEach(function (m) {
+      m.buttons.forEach(function (b, i) { b.setAttribute("aria-checked", marks[m.id] === choices[i] ? "true" : "false"); });
+    });
   }
 
   var items = [];
@@ -289,13 +358,22 @@
     if (edit) writeBack(it, edit.t);
   });
 
+  if (saved && saved.v === 1 && saved.marks && typeof saved.marks === "object" && !Array.isArray(saved.marks)) {
+    markIds.forEach(function (id) {
+      var value = Object.prototype.hasOwnProperty.call(saved.marks, id) ? saved.marks[id] : null;
+      if (typeof value === "string" && choices.indexOf(value) >= 0) marks[id] = value;
+    });
+    paintMarks();
+  }
+  function markCount() { return Object.keys(marks).length; }
+
   savedList("notes").some(function (n) {
     if (n && typeof n === "object" && n.o === undefined && cleanNote(n.c)) { pageNote = cleanNote(n.c); return true; }
     return false;
   });
   function noted() { return items.filter(function (it) { return it.note; }); }
   function noteCount() { return noted().length + (pageNote ? 1 : 0); }
-  function total() { return changes().length + noteCount(); }
+  function total() { return changes().length + noteCount() + markCount(); }
   function changes() {
     return items.filter(function (it) { return text(it.node) !== it.original; });
   }
@@ -313,6 +391,10 @@
     });
     if (pageNote) notes.push({ c: pageNote });
     if (notes.length) map.notes = notes;
+    if (markCount()) {
+      map.marks = {};
+      markIds.forEach(function (id) { if (marks[id]) map.marks[id] = marks[id]; });
+    }
     if (sent) map.sent = sent;
     try { localStorage.setItem(KEY, JSON.stringify(map)); } catch (e) { /* private mode: edits last until reload */ }
     render();
@@ -322,6 +404,15 @@
     var lines = [t("reportTitle", { title: title })];
     if (genre) lines.push(t("genre", { genre: genre }));
     var head = lines.length;
+    if (choices.length && total() > 0) {
+      var unmarked = markIds.filter(function (id) { return !marks[id]; });
+      lines.push("", t("marksHead", { n: markIds.length - unmarked.length, total: markIds.length }));
+      choices.forEach(function (choice) {
+        var ids = markIds.filter(function (id) { return marks[id] === choice; });
+        if (ids.length) lines.push(choice + t("separator") + ids.join(", "));
+      });
+      if (unmarked.length) lines.push(t("unmarked") + t("separator") + unmarked.join(", "));
+    }
     function hint(it) {
       return it.total > 1 ? t("occurrence", { index: it.index, total: it.total,
         heading: it.heading ? t("heading", { heading: it.heading }) : "" }) : "";
@@ -340,6 +431,10 @@
     return lines.join("\n");
   }
 
+  function setMark(id, choice) {
+    if (choice) marks[id] = choice; else delete marks[id];
+    paintMarks(); hideSheet(); persist();
+  }
   var sent = saved && saved.v === 1 && typeof saved.sent === "string" ? saved.sent : "";
   var destination = typeof config.send_to === "string" ? config.send_to.replace(/\s+/g, " ").trim() : "";
   if (destination.length > 60) destination = destination.slice(0, 60) + "…";
@@ -372,13 +467,17 @@
     "#fixwords-panel .fixwords-row{border-top:1px solid var(--edge);padding:12px 0;overflow-wrap:anywhere}#fixwords-panel .fixwords-location{color:var(--muted);font-size:13px}#fixwords-panel .fixwords-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere;margin:6px 0}#fixwords-panel del{color:var(--muted);text-decoration:line-through}#fixwords-panel .fixwords-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}" +
     "#fixwords-panel .fixwords-row button{border:1px solid var(--edge)}#fixwords-notice{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border-radius:10px;background:rgba(127,127,127,.12);overflow-wrap:anywhere}#fixwords-notice-text{flex:1;min-width:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}#fixwords-panel #fixwords-undo{flex:none;border:1px solid var(--accent);color:var(--accent)}#fixwords-panel #fixwords-reset-all{color:var(--danger)}" +
     "body.fixwords-editing [data-fixwords-editable]{outline:1px dashed #e0a200;outline-offset:3px}body.fixwords-editing [data-fixwords-editable]:focus{outline:2px solid #e0a200;background:rgba(224,162,0,.14)}body.fixwords-editing [data-fixwords-changed]{box-shadow:inset 0 -3px 0 #e0a200}body.fixwords-show-changes [data-fixwords-changed]{background:rgba(255,214,10,.55);outline:2px solid #e0a200;outline-offset:2px;color:#000}" +
-    "@media(prefers-color-scheme:dark){#fixwords-svg-input,#fixwords-note-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#1f2329;--ink:#f2f4f6;--edge:rgba(242,244,246,.3);--accent:#35b3a7;--accent-ink:#191d22;--amber:#fbbf24;--danger:#f97066;--muted:#bdc4cd}}" +
+    "@media(prefers-color-scheme:dark){.fixwords-marks,#fixwords-svg-input,#fixwords-note-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#1f2329;--ink:#f2f4f6;--edge:rgba(242,244,246,.3);--accent:#35b3a7;--accent-ink:#191d22;--amber:#fbbf24;--danger:#f97066;--muted:#bdc4cd}}" +
     "@media(hover:hover) and (pointer:fine){#fixwords-bar button:hover,#fixwords-panel button:hover,#fixwords-handle:hover{box-shadow:inset 0 0 0 2px var(--accent)}body.fixwords-editing [data-fixwords-editable]{cursor:text}}" +
     "@media(max-width:600px){#fixwords-bar:not([data-idle]),#fixwords-panel{right:0;bottom:0;width:100%;border-radius:16px 16px 0 0;padding-bottom:max(12px,env(safe-area-inset-bottom,0px));padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}}" +
     ".fixwords-box{fill:none;stroke:#e0a200;stroke-dasharray:3 2;vector-effect:non-scaling-stroke;pointer-events:none}.fixwords-box.changed{fill:rgba(224,162,0,.16);stroke-dasharray:none}" +
     "#fixwords-svg-input{position:absolute;right:auto;bottom:auto;z-index:2147482999;font-size:16px;min-height:44px;padding:8px;border:2px solid #e0a200;border-radius:8px;margin:0}" +
     "#fixwords-note-input{display:block;position:absolute;right:auto;bottom:auto;z-index:2147482999;font-size:16px;font-weight:400;min-height:44px;padding:8px;border:2px solid #2563eb;border-radius:8px;margin:0;resize:none;overflow:auto}" +
     "[data-fixwords-noted]{text-decoration:underline dotted #2563eb 2px;text-underline-offset:4px}.fixwords-box.noted{stroke:#2563eb;stroke-dasharray:1 3;stroke-linecap:round}#fixwords-bar #fixwords-pagenote[data-noted]{box-shadow:inset 0 -3px 0 #2563eb}#fixwords-bar #fixwords-comment[aria-pressed=true]{box-shadow:inset 0 0 0 2px #2563eb}" +
+    ".fixwords-marks{--surface:#fff;--ink:#191d22;--edge:rgba(25,29,34,.24);--accent:#0b6e66;--accent-ink:#fff;display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0;padding:0;border:0;background:none;font:500 15px/1.3 'Hiragino Sans','Yu Gothic','Noto Sans CJK JP',sans-serif;text-align:left}" +
+    ".fixwords-marks button[role=radio]{box-sizing:border-box;display:inline-block;width:auto;min-width:48px;min-height:32px;margin:0;padding:4px 14px;font:inherit;line-height:1.3;letter-spacing:normal;text-transform:none;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--edge);border-radius:999px;box-shadow:none;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}" +
+    ".fixwords-marks button[role=radio][aria-checked=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}.fixwords-marks button[role=radio]:focus-visible{outline:3px solid var(--accent);outline-offset:2px}" +
+    "@media(pointer:coarse){.fixwords-marks button[role=radio]{min-height:44px;min-width:56px}}" +
     "@media print{.fixwords-box,#fixwords-svg-input,#fixwords-note-input{display:none!important}}" +
     "@media(prefers-reduced-motion:reduce){#fixwords-bar,#fixwords-panel,#fixwords-bar button,#fixwords-panel button,#fixwords-handle,#fixwords-status{transition:none}}";
   document.head.appendChild(css);
@@ -449,22 +548,30 @@
     panel.style.scrollPaddingTop = listView.hidden ? "" : listTop.offsetHeight + "px";
   }
   function render() {
-    var e = changes().length, m = noteCount(), n = e + m, pending = n && unsent(), idle = !editing && !n;
+    var e = changes().length, m = noteCount(), k = markCount(), n = e + m, all = n + k, pending = all && unsent(), idle = !editing && !all;
     bar.hidden = closed; handle.hidden = !closed;
     if (idle) bar.setAttribute("data-idle", ""); else bar.removeAttribute("data-idle");
     start.textContent = idle ? t("startIdle") : t("start");
-    content.hidden = idle; guide.hidden = !editing || n > 0; reset.hidden = !n;
+    content.hidden = idle; guide.hidden = !editing || all > 0; reset.hidden = !all;
     commentBtn.hidden = idle; commentBtn.setAttribute("aria-pressed", commenting ? "true" : "false");
     pageBtn.hidden = !commenting; if (pageNote) pageBtn.setAttribute("data-noted", ""); else pageBtn.removeAttribute("data-noted");
     toggle.textContent = editing ? t("stop") : t("continue");
     toggle.setAttribute("aria-pressed", editing ? "true" : "false");
     var sentKey = (sentMode === "shared" ? "sharedStatus" : "copiedStatus") + (m ? "Notes" : "");
-    status.textContent = !n ? t("empty") : pending ? t(m ? "pendingNotes" : "pending", { n: e, m: m }) : t(sentKey, { n: e, m: m });
-    status.setAttribute("data-state", !n ? "empty" : pending ? "unsent" : "sent");
+    status.textContent = !all ? t("empty") : pending ? t(m ? "pendingNotes" : "pending", { n: e, m: m }) : t(sentKey, { n: e, m: m });
     send.textContent = m ? t("sendCountNotes", { n: e, m: m }) : t("sendCount", { n: n });
-    send.setAttribute("aria-disabled", !n ? "true" : "false");
-    badge.hidden = !pending; badge.textContent = n;
-    handle.setAttribute("aria-label", t("open") + (pending ? t("unsent", { n: n }) : ""));
+    if (choices.length) {
+      var v = { k: k, all: markIds.length, n: e, m: m };
+      var parts = [t("partMarks", v)], stats = [t("statMarks", v)];
+      if (e) { parts.push(t("partEdits", v)); stats.push(t("statEdits", v)); }
+      if (m) { parts.push(t("partNotes", v)); stats.push(t("statNotes", v)); }
+      status.textContent = !all ? t("empty") : stats.join(t("statJoin")) + t(pending ? "tailPending" : sentMode === "shared" ? "tailShared" : "tailCopied");
+      send.textContent = t("sendMarks", { parts: parts.join(t("statJoin")) });
+    }
+    status.setAttribute("data-state", !all ? "empty" : pending ? "unsent" : "sent");
+    send.setAttribute("aria-disabled", !all ? "true" : "false");
+    badge.hidden = !pending; badge.textContent = all;
+    handle.setAttribute("aria-label", t("open") + (pending ? t("unsent", { n: all }) : ""));
     if (!closed) reveal(bar); else bar.removeAttribute("data-visible");
     layout();
   }
@@ -809,7 +916,7 @@
   resetAll.addEventListener("click", function () {
     if (!total() || !window.confirm(t("confirm"))) return;
     items.forEach(function (it) { writeBack(it, it.original); it.note = ""; });
-    pageNote = "";
+    pageNote = ""; marks = Object.create(null); paintMarks();
     sent = ""; hideSheet(true); persist(); mark();
   });
   window.addEventListener("beforeunload", function (e) { if (unsent()) { e.preventDefault(); e.returnValue = ""; } });
