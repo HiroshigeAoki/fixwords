@@ -299,9 +299,25 @@
     });
   }
 
+  // Only an element whose children are all text is editable. Text beside other elements (a sentence around
+  // a link) is wrapped first in an element of its own, so that it can be edited and the link stays a link. The
+  // custom tag is inline and matches no span rule of the page. Labels, summaries and buttons are left alone:
+  // a click on their text would toggle or focus something else instead of placing the caret.
+  var PART = "fixwords-text";
+  Array.prototype.forEach.call(document.body.querySelectorAll("*"), function (node) {
+    if (node.namespaceURI !== "http://www.w3.org/1999/xhtml" || node.closest(SKIP) || node.closest("label,summary,button")) return;
+    var kids = Array.prototype.slice.call(node.childNodes);
+    if (!kids.some(function (c) { return c.nodeType === 1 && c.nodeName !== "BR"; })) return;
+    kids.forEach(function (c) {
+      if (c.nodeType !== 3 || !c.data.trim()) return;
+      var wrap = document.createElement(PART);
+      node.replaceChild(wrap, c); wrap.appendChild(c);
+    });
+  });
   var items = [];
   var headings = [];
-  var totals = [Object.create(null), Object.create(null)];
+  // Counted apart: HTML elements, SVG labels, and wrapped parts (so that parts do not shift saved older edits).
+  var totals = [Object.create(null), Object.create(null), Object.create(null)];
   Array.prototype.forEach.call(document.body.querySelectorAll("*"), function (node) {
     if (/^H[1-6]$/.test(node.nodeName) && !node.closest("#fixwords-bar, #fixwords-panel")) {
       headings.push(node);
@@ -326,14 +342,15 @@
       });
     }
     var original = text(node);
-    var counts = totals[svg ? 1 : 0];
+    var part = node.localName === PART, kind = svg ? 1 : part ? 2 : 0;
+    var counts = totals[kind];
     counts[original] = (counts[original] || 0) + 1;
     var h = headings.length - 1;
     while (h >= 0 && headings[h].contains(node)) h--;
     var heading = h >= 0 ? headings[h] : null;
     var hint = heading ? heading.textContent.replace(/\s+/g, " ").trim() : "";
     if (hint.length > 30) hint = hint.slice(0, 30) + "…";
-    items.push({ node: node, original: original, index: counts[original], heading: hint, svg: svg, raw: svg ? node.textContent : "" });
+    items.push({ node: node, original: original, index: counts[original], heading: hint, svg: svg, part: part, kind: kind, raw: svg ? node.textContent : "" });
   });
   // A note is a plain string per element (it.note) plus one page-level note.
   var pageNote = "";
@@ -345,13 +362,13 @@
   function savedFor(name, it, valid) {
     var found = null;
     savedList(name).some(function (e) {
-      if (e && e.o === it.original && !!e.s === it.svg && e.i === it.index && e.n === it.total && valid(e)) { found = e; return true; }
+      if (e && e.o === it.original && !!e.s === it.svg && !!e.w === it.part && e.i === it.index && e.n === it.total && valid(e)) { found = e; return true; }
       return false;
     });
     return found;
   }
   items.forEach(function (it) {
-    it.total = totals[it.svg ? 1 : 0][it.original];
+    it.total = totals[it.kind][it.original];
     var n = savedFor("notes", it, function (e) { return cleanNote(e.c); });
     it.note = n ? cleanNote(n.c) : "";
     var edit = savedFor("edits", it, function (e) { return typeof e.t === "string"; });
@@ -382,11 +399,13 @@
     var map = { v: 1, closed: closed, edits: changed.map(function (it) {
       var edit = { o: it.original, i: it.index, n: it.total, t: text(it.node) };
       if (it.svg) edit.s = 1;
+      if (it.part) edit.w = 1;
       return edit;
     }) };
     var notes = noted().map(function (it) {
       var n = { o: it.original, i: it.index, n: it.total, c: it.note };
       if (it.svg) n.s = 1;
+      if (it.part) n.w = 1;
       return n;
     });
     if (pageNote) notes.push({ c: pageNote });

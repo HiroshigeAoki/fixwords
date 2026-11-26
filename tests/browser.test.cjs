@@ -99,6 +99,38 @@ test('hide on a phone keeps the room under the text, so the page does not jump',
   assert.ok(await q.evaluate(() => document.getElementById('fixwords-spacer').offsetHeight) > 100);
   await done(q);
 });
+test('text beside a link is editable on its own and the link stays a link', async () => {
+  const p = await open('en', {permissions:['clipboard-read','clipboard-write']});
+  await p.route('**/mixed.html', route => route.fulfill({contentType:'text/html; charset=utf-8', body:
+    '<html lang="en"><head><title>Mixed</title></head><body><ul><li id="mixed">Use the same form (<a id="ref" href="#form">FORM-1</a>) as before.</li></ul>' +
+    '<p id="strong">Keep <strong>this</strong> line</p><p id="alone">) as before.</p><label id="lab">Name <input></label>' +
+    '<script src="/fixwords.js"></script></body></html>'}));
+  await p.goto(env.base + '/mixed.html');
+  // An edit saved before parts existed still finds its element: parts are counted apart.
+  await p.evaluate(() => localStorage.setItem('fixwords:/mixed.html', JSON.stringify({ v: 1, closed: false,
+    edits: [{ o: ') as before.', i: 1, n: 1, t: ') as ever.' }] })));
+  await p.reload();
+  assert.equal(await p.locator('#alone').textContent(), ') as ever.');
+  assert.equal(await p.locator('#mixed').textContent(), 'Use the same form (FORM-1) as before.');
+  assert.equal(await p.locator('#lab fixwords-text').count(), 0);
+  await start(p);
+  const runs = p.locator('#mixed [data-fixwords-editable]');
+  assert.deepEqual(await runs.allTextContents(), ['Use the same form (', 'FORM-1', ') as before.']);
+  assert.equal(await p.locator('#strong [data-fixwords-editable]').count(), 3);
+  await edit(p, '#mixed > fixwords-text >> nth=0', 'Use the 2020 form (');
+  await edit(p, '#mixed > fixwords-text >> nth=1', ').');
+  assert.equal(await p.locator('#mixed').textContent(), 'Use the 2020 form (FORM-1).');
+  assert.equal(await p.locator('#ref').getAttribute('href'), '#form');
+  await p.locator('#fixwords-send').click();
+  const report = await p.evaluate(() => navigator.clipboard.readText());
+  assert.match(report, /Use the same form \(/); assert.match(report, /Use the 2020 form \(/);
+  const stored = await p.evaluate(() => JSON.parse(localStorage.getItem('fixwords:/mixed.html')).edits);
+  assert.deepEqual(stored.filter(e => e.w).map(e => e.t), ['Use the 2020 form (', ').']);
+  await p.reload();
+  assert.equal(await p.locator('#mixed').textContent(), 'Use the 2020 form (FORM-1).');
+  assert.equal(await p.locator('#alone').textContent(), ') as ever.');
+  await done(p);
+});
 test('language selection: page, configuration and navigator', async () => {
   for (const [html, configured, locale, expected] of [
     ['ja', null, 'en-US', '文言を直す'], ['en',null,'ja-JP','Fix wording'],
