@@ -166,8 +166,7 @@ async function pasteShot(browser, lang) {
 async function verdictShot(browser, lang) {
   const s = TEXT[lang];
   const { context, page } = await open(browser, `checklist.${lang}.html`);
-  const choices = lang === 'en' ? { ok: 'OK', ng: 'NG' } : { ok: 'OK', ng: 'NG' };
-  const picks = [['1', choices.ok], ['2', choices.ng], ['4', choices.ok]];
+  const picks = [['1', 'OK'], ['2', 'NG'], ['4', 'OK']];
   for (const [id, label] of picks) {
     await page.locator(`[data-fixwords-mark="${id}"] button[role=radio]`).filter({ hasText: new RegExp('^' + label + '$') }).click();
   }
@@ -198,7 +197,8 @@ function shrink(file) {
     execFileSync('magick', [file, '+dither', '-colors', '128', '-strip', 'PNG8:' + tmp], { stdio: 'ignore' });
     fs.renameSync(tmp, file);
   } catch (e) {
-    if (e.code !== 'ENOENT') throw e; // magick missing: keep the full-colour PNG
+    if (e.code !== 'ENOENT') throw e;
+    console.warn('magick not found: ' + path.basename(file) + ' stays full-colour (larger than the committed PNG)');
   }
 }
 
