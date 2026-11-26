@@ -49,7 +49,8 @@ Working with a coding agent? Ask it:
    bring the panel back.
 3. To ask a question or leave a remark instead of rewriting, press **💬 Comment**, tap the text and write it
    (Ctrl/Cmd+Enter or tapping elsewhere saves). **Comment on the whole page** adds a note that belongs to no text.
-   Commented text gets a dotted underline.
+   Press **✓ Finish commenting** or Esc to leave comment mode. Commented text gets a dotted underline and a 💬 button
+   after its last character, which opens the comment again at any time.
 4. To take back a change, press **Reset changes**. It opens a list of the changed texts; **Undo** on a row reverts
    just that text, and **Restore** in the notice brings the last one back until the list is closed. Once no
    changed text is left, the list title goes away and a **Close** button
