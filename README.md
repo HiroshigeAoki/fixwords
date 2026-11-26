@@ -45,6 +45,8 @@ Working with a coding agent? Ask it:
 
 1. Press **Fix wording**.
 2. Tap any text and rewrite it. Changed text is highlighted.
+   If the panel covers the text, press **Hide**: editing goes on and only the ✎ button stays in the corner. Tap ✎ to
+   bring the panel back.
 3. To ask a question or leave a remark instead of rewriting, press **💬 Comment**, tap the text and write it
    (Ctrl/Cmd+Enter or tapping elsewhere saves). **Comment on the whole page** adds a note that belongs to no text.
    Commented text gets a dotted underline.

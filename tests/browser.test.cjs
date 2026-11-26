@@ -45,6 +45,51 @@ test('self enabling, head/body placement, duplicate load and metadata defaults',
     await done(p);
   }
 });
+test('hide tucks the bar into the pen button while editing stays on, and the pen brings it back', async () => {
+  for (const lang of ['en','ja']) {
+    const p = await open(lang);
+    const hide = p.locator('#fixwords-hide');
+    assert.equal(await hide.isVisible(), false);
+    await start(p);
+    assert.equal(await hide.textContent(), lang === 'en' ? 'Hide' : '隠す');
+    await edit(p);
+    await hide.click();
+    assert.equal(await p.locator('#fixwords-bar').isVisible(), false);
+    assert.equal(await p.locator('#fixwords-handle').isVisible(), true);
+    assert.equal(await p.locator('#fixwords-badge').textContent(), '1');
+    assert.equal(await p.evaluate(() => document.activeElement.id), 'fixwords-handle');
+    // Still editing: the text stays editable and new edits count on the badge.
+    assert.equal(await p.locator('#dup2').getAttribute('contenteditable'), 'plaintext-only');
+    await edit(p, '#dup1', 'Fresh rolls');
+    assert.equal(await p.locator('#fixwords-badge').textContent(), '2');
+    // Hiding is not closing: nothing is stored as closed, and a reload shows the bar again.
+    assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('fixwords:' + location.pathname)).closed), false);
+    await p.locator('#fixwords-handle').click();
+    assert.equal(await p.locator('#fixwords-bar').isVisible(), true);
+    assert.equal(await p.locator('#fixwords-handle').isVisible(), false);
+    assert.equal(await p.evaluate(() => document.activeElement.id), 'fixwords-hide');
+    assert.match(await p.locator('#fixwords-status').textContent(), /2/);
+    assert.equal(await p.locator('#dup2').getAttribute('contenteditable'), 'plaintext-only');
+    // The cross keeps its meaning: it closes the bar and ends editing.
+    await p.locator('#fixwords-bar button[aria-label]').click();
+    assert.equal(await p.locator('#dup2').getAttribute('contenteditable'), null);
+    await p.locator('#fixwords-handle').click();
+    assert.equal(await p.locator('#fixwords-bar').isVisible(), true);
+    assert.equal(await p.locator('#dup2').getAttribute('contenteditable'), null);
+    await done(p);
+  }
+});
+test('hide on a phone keeps the room under the text, so the page does not jump', async () => {
+  const p = await open('en', { viewport: { width: 390, height: 500 } });
+  await p.evaluate(() => { for (let i = 0; i < 30; i++) { const q = document.createElement('p'); q.textContent = 'Filler ' + i; document.body.appendChild(q); } });
+  await start(p);
+  await edit(p);
+  await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const y = await p.evaluate(() => window.scrollY);
+  await p.locator('#fixwords-hide').click();
+  assert.equal(await p.evaluate(() => window.scrollY), y);
+  await done(p);
+});
 test('language selection: page, configuration and navigator', async () => {
   for (const [html, configured, locale, expected] of [
     ['ja', null, 'en-US', '文言を直す'], ['en',null,'ja-JP','Fix wording'],

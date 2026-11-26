@@ -7,6 +7,7 @@
     "startIdle": "✎ 文言を直す",
     "start": "文言を直す",
     "close": "閉じる",
+    "hide": "隠す",
     "stepOne": "① 直したい文字をタップして書き換える",
     "stepDestination": "② 「直した内容を送る」を押す。",
     "stepTwo": "② 「直した内容を送る」を押して、依頼してきた人へのチャットやメールに貼る",
@@ -92,6 +93,7 @@
     "startIdle": "✎ Fix wording",
     "start": "Fix wording",
     "close": "Close",
+    "hide": "Hide",
     "stepOne": "1. Tap the words you want to change and rewrite them.",
     "stepDestination": "2. Tap “Send your changes”. ",
     "stepTwo": "2. Tap “Send your changes”, then paste them into a chat or email to the author.",
@@ -216,6 +218,8 @@
   try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { /* Storage is optional. */ }
   // Closed: the bar is folded into a small handle so it does not cover the page.
   var closed = !!(saved && saved.v === 1 && saved.closed === true);
+  // Hidden by the Hide button: the bar is tucked into the pen button while editing goes on. Not saved.
+  var tucked = false;
 
   function flat(s) { return s.replace(/[ \t\n\r\f]+/g, " "); }
   function collapses(node) { return /^(normal|nowrap)$/.test(getComputedStyle(node).whiteSpace); }
@@ -451,7 +455,7 @@
     "#fixwords-bar button:active,#fixwords-panel button:active,#fixwords-handle:active{transform:scale(.97)}" +
     "#fixwords-bar button:focus-visible,#fixwords-panel button:focus-visible,#fixwords-panel textarea:focus-visible,#fixwords-handle:focus-visible{outline:3px solid var(--accent);outline-offset:2px}" +
     "#fixwords-bar [hidden],#fixwords-panel [hidden],#fixwords-bar[hidden],#fixwords-panel[hidden],#fixwords-handle[hidden]{display:none!important}" +
-    "#fixwords-header,#fixwords-secondary,#fixwords-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}#fixwords-header{flex-wrap:nowrap}#fixwords-title{font-weight:600}" +
+    "#fixwords-header,#fixwords-secondary,#fixwords-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}#fixwords-header{flex-wrap:nowrap}#fixwords-hide{margin-left:auto}#fixwords-title{font-weight:600}" +
     "#fixwords-guide{margin:4px 0 12px}#fixwords-guide strong{display:block;margin-top:6px}#fixwords-status{color:var(--muted);margin:8px 0;transition:opacity 200ms cubic-bezier(.23,1,.32,1)}" +
     "#fixwords-status[data-state=unsent]{color:var(--amber)}#fixwords-status[data-state=sent]{color:var(--accent)}#fixwords-status[data-state=unsent]:before{content:'● ';}#fixwords-status[data-state=sent]:before{content:'✓ ';}" +
     "#fixwords-bar #fixwords-send{width:100%;min-height:48px;background:var(--accent);color:var(--accent-ink);font-size:16px;font-weight:600}#fixwords-bar #fixwords-send[aria-disabled=true]{background:var(--edge);color:var(--muted)}" +
@@ -486,6 +490,8 @@
   var bar = element("div", "bar", document.body);
   var header = element("div", "header", bar);
   var start = button(t("startIdle"), header, "title");
+  // Hide tucks the bar into the pen button and keeps editing on; the cross also ends editing.
+  var hide = button(t("hide"), header, "hide");
   var close = button(t("iconClose"), header); close.setAttribute("aria-label", t("close"));
   var content = element("div", "content", bar);
   var guide = element("div", "guide", content);
@@ -538,7 +544,8 @@
     var open = !closed && (editing || total() > 0);
     if (phone && open && panel.hidden) {
       if (!spacer.parentNode) document.body.appendChild(spacer);
-      spacer.style.height = bar.offsetHeight + "px";
+      // A tucked bar keeps its room, so the text being edited does not jump.
+      if (!tucked) spacer.style.height = bar.offsetHeight + "px";
     } else if (spacer.parentNode) spacer.parentNode.removeChild(spacer);
     panel.style.maxHeight = Math.max(80, window.innerHeight - 28) + "px";
     // A button that takes focus is scrolled clear of the pinned list top, not under it.
@@ -546,7 +553,7 @@
   }
   function render() {
     var e = changes().length, m = noteCount(), k = markCount(), n = e + m, all = n + k, pending = all && unsent(), idle = !editing && !all;
-    bar.hidden = closed; handle.hidden = !closed;
+    bar.hidden = closed || tucked; handle.hidden = !bar.hidden; hide.hidden = idle;
     if (idle) bar.setAttribute("data-idle", ""); else bar.removeAttribute("data-idle");
     start.textContent = idle ? t("startIdle") : t("start");
     content.hidden = idle; guide.hidden = !editing || all > 0; reset.hidden = !all;
@@ -571,7 +578,7 @@
     send.setAttribute("aria-disabled", !all ? "true" : "false");
     badge.hidden = !pending; badge.textContent = all;
     handle.setAttribute("aria-label", t("open") + (pending ? t("unsent", { n: all }) : ""));
-    if (!closed) reveal(bar); else bar.removeAttribute("data-visible");
+    if (!bar.hidden) reveal(bar); else bar.removeAttribute("data-visible");
     layout();
   }
   // The box exists while editing, or while the label is changed; it is rebuilt on every call
@@ -906,7 +913,11 @@
     persist();
   }
   close.addEventListener("click", function () { setClosed(true); });
-  handle.addEventListener("click", function () { setClosed(false); });
+  hide.addEventListener("click", function () { tucked = true; hideSheet(); handle.focus(); });
+  handle.addEventListener("click", function () {
+    if (!tucked) return setClosed(false);
+    tucked = false; render(); hide.focus();
+  });
   reset.addEventListener("pointerdown", function () { finishSvg(true, false); finishNote(true, false); });
   reset.addEventListener("click", function () {
     finishSvg(true, false); finishNote(true, false);
