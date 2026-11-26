@@ -167,9 +167,9 @@ python3 fixwords.py stats
 ```mermaid
 flowchart LR
   report["received report"] --> log["fixwords.py log"] --> store[("log")] --> learn["fixwords.py learn"]
-  learn --> prh["prh.yml"] --> lint["textlint"]
-  learn --> cand["candidates.md"] --> decide{"accept / reject"} --> learn
   learn --> digest["digest.md"] --> guide["style-guide.md<br>(LLM summary, reviewed by you)"] --> agent["your coding agent"]
+  learn --> cand["candidates.md"] --> decide{"accept / reject"} --> learn
+  learn --> prh["prh.yml"] --> lint["textlint"]
 ```
 
 The log and generated files live in `~/.local/share/fixwords/`, or `$FIXWORDS_HOME` when nonempty.

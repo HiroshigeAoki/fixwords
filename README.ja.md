@@ -164,9 +164,9 @@ python3 fixwords.py stats
 ```mermaid
 flowchart LR
   report["届いた一覧"] --> log["fixwords.py log"] --> store[("ログ")] --> learn["fixwords.py learn"]
-  learn --> prh["prh.yml"] --> lint["textlint"]
-  learn --> cand["candidates.md"] --> decide{"採用 / 却下"} --> learn
   learn --> digest["digest.md"] --> guide["style-guide.md<br>(LLM の要約を自分で確認)"] --> agent["コーディング AI"]
+  learn --> cand["candidates.md"] --> decide{"採用 / 却下"} --> learn
+  learn --> prh["prh.yml"] --> lint["textlint"]
 ```
 
 ログと生成ファイルは `~/.local/share/fixwords/` に保存します。`FIXWORDS_HOME` で変更できます。空なら既定の保存先を使います。
