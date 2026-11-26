@@ -299,6 +299,18 @@
     });
   }
 
+  // Only an element whose children are all text is editable. Text beside other elements (a sentence around
+  // a link) gets a span of its own first, so that it can be edited and the link stays a link.
+  Array.prototype.forEach.call(document.body.querySelectorAll("*"), function (node) {
+    if (isSvg(node) || node.closest(SKIP)) return;
+    var kids = Array.prototype.slice.call(node.childNodes);
+    if (!kids.some(function (c) { return c.nodeType === 1 && c.nodeName !== "BR"; })) return;
+    kids.forEach(function (c) {
+      if (c.nodeType !== 3 || !c.data.trim()) return;
+      var wrap = document.createElement("span");
+      node.replaceChild(wrap, c); wrap.appendChild(c);
+    });
+  });
   var items = [];
   var headings = [];
   var totals = [Object.create(null), Object.create(null)];
