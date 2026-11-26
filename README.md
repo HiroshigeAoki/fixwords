@@ -13,11 +13,11 @@ it, press one button, and paste the result into a chat or an email to you:
 ```
 Room booking (mockup) — Wording changes
 
-1. Before: Please select your desired date and time to make a booking.
-   After: Pick a date and time to book.
+1. Before: Unlock seamless collaboration by effortlessly booking your perfect space.
+   After: Pick a date and time to book a room.
 
-2. (figure) Before: Awaiting approval
-   After: Waits for approval
+2. (figure) Before: Approval process in progress
+   After: Awaiting approval
 ```
 
 You apply the list to the source yourself, or paste it to your agent.

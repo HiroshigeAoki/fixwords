@@ -13,16 +13,16 @@ const WIDTH = 600;
 
 const TEXT = {
   en: {
-    intro: 'Please select your desired date and time to make a booking.', introNew: 'Pick a date and time to book.',
-    label: 'Awaiting approval', labelNew: 'Waits for approval',
+    intro: 'Unlock seamless collaboration by effortlessly booking your perfect space.', introNew: 'Pick a date and time to book a room.',
+    label: 'Approval process in progress', labelNew: 'Awaiting approval',
     question: 'Say who approves it?',
     other: 'Bookings cannot be cancelled.', otherNote: 'Not even the day before?',
     before: 'Before:', comment: 'Comment on:', title: 'Room booking (mockup) — Wording changes',
     checklistTitle: 'Acceptance check',
   },
   ja: {
-    intro: 'ご希望の日時を選択して予約を行ってください。', introNew: '使いたい日時を選んで予約します。',
-    label: '承認待ち', labelNew: '承認を待ちます',
+    intro: 'シームレスな予約体験で、チームの生産性を最大化しましょう。', introNew: '日時を選んで、会議室を予約します。',
+    label: '承認プロセスを実行中', labelNew: '承認待ち',
     question: '誰が承認するかも書きませんか？',
     other: '予約は取り消せません。', otherNote: '前日でも取り消せませんか？',
     before: '元：', comment: 'コメント（対象：', title: '会議室予約（モック） 文言の直し',
