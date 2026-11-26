@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Room booking (mockup)</title>
+  <style>
+    body { max-width: 42rem; margin: auto; padding: 24px; font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: #1f2933; background: #e9eef4; }
+    .card { background: #fff; border: 1px solid #d3dbe4; border-radius: 12px; padding: 24px; }
+    h1, h2 { line-height: 1.2; }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    h2 { margin: 24px 0 8px; font-size: 20px; }
+    p { margin: 0 0 16px; }
+    .row { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; }
+    .row span { flex: none; width: 5.5em; color: #52606d; font-size: 15px; }
+    .row div { flex: 1; border: 1px solid #c5cfdb; border-radius: 8px; padding: 8px 12px; background: #f7f9fb; }
+    .btn { display: block; margin: 16px 0; padding: 10px 16px; border-radius: 8px; background: #2f6fdb; color: #fff; font-weight: 600; text-align: center; }
+    .note { margin: 0; font-size: 14px; color: #52606d; }
+    svg { display: block; max-width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Book a room</h1>
+    <p>Unlock seamless collaboration by effortlessly booking your perfect space.</p>
+    <div class="row"><span>Room</span><div>Room A (8 seats)</div></div>
+    <div class="row"><span>Date</span><div>Tue 14 April</div></div>
+    <div class="row"><span>Time</span><div>10:00 – 11:00</div></div>
+    <div class="btn">Submit booking</div>
+    <h2>After you book</h2>
+    <svg viewBox="0 0 460 100" width="460" role="img" aria-label="What happens after booking">
+      <rect x="4" y="10" width="260" height="70" rx="12" fill="#dbe7fb"/>
+      <rect x="322" y="10" width="134" height="70" rx="12" fill="#d9f0e3"/>
+      <path d="M270 45h46m-8-8 8 8-8 8" fill="none" stroke="#52606d" stroke-width="2"/>
+      <text x="20" y="51" font-size="18">Approval process in progress</text>
+      <text x="338" y="51" font-size="18">Room is yours</text>
+    </svg>
+    <p class="note">Bookings cannot be cancelled.</p>
+  </div>
+  <script src="../../../fixwords.js"></script>
+</body>
+</html>

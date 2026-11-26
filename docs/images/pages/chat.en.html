@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wording fixes</title>
+  <style>
+    body { max-width: 42rem; margin: auto; padding: 20px; font: 16px/1.5 "Noto Sans CJK JP", "Hiragino Sans", "Yu Gothic", sans-serif; color: #1f2933; background: #eef1f4; }
+    .msg { display: flex; gap: 10px; margin: 0 0 16px; }
+    .avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 600; }
+    .author .avatar { background: #7a6a4f; }
+    .reader .avatar { background: #3f7d73; }
+    .body { background: #fff; border: 1px solid #d5dbe1; border-radius: 4px 14px 14px 14px; padding: 8px 12px; min-width: 0; }
+    .name { font-size: 13px; color: #5b6670; margin: 0 0 2px; }
+    p { margin: 0; }
+    pre { margin: 4px 0 0; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <div class="msg author"><div class="avatar">A</div><div class="body"><p class="name">Author</p><p>Thanks for looking at the booking screen. Please paste the list of wording fixes here.</p></div></div>
+  <div class="msg reader"><div class="avatar">R</div><div class="body"><p class="name">Reader</p><pre id="report"></pre></div></div>
+</body>
+</html>

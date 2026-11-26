@@ -2,23 +2,28 @@
 
 [日本語](README.ja.md)
 
-Let the people you shared a page with fix its wording themselves.
+A small tool that lets the people you shared an HTML page with fix its wording themselves.
 
-You made a mockup or a draft page (perhaps with an AI coding agent) and sent it to colleagues who do not write
-code. They spot wording they would change. With fixwords on the page they rewrite the text right where they see
-it, press one button, and paste the result into a chat or an email to you:
+<p><img src="docs/images/edit-en.png" width="440" alt="A room booking mockup in edit mode. The lead sentence and a label in the figure were rewritten and are highlighted, and the fixwords bar at the bottom shows 2 changes."></p>
+
+Example:
+
+You had an AI coding agent make a mockup or a document as an HTML page, and reading it you spot wording you
+would change. With fixwords on the page you rewrite the text right where you see it, press one button, and paste
+the result back to the agent. You can also send the page to colleagues who do not write code and have them send
+you the list in a chat or an email.
 
 ```
-The little bakery — Wording changes
+Room booking (mockup) — Wording changes
 
-1. Before: Warm bread for a slower morning.
-   After: Warm bread for a slow morning.
+1. Before: Unlock seamless collaboration by effortlessly booking your perfect space.
+   After: Pick a date and time to book a room.
 
-2. (figure) Before: Bake the loaf
-   After: Bake the bread
+2. (figure) Before: Approval process in progress
+   After: Awaiting approval
 ```
 
-You apply the list to the source yourself, or paste it to your agent.
+The agent applies the list to the source. You can also apply it yourself.
 
 - One script file, no dependencies, no build step, no server. Nothing is sent anywhere by the script.
 - Works on plain static HTML, including text labels inside inline SVG figures.
@@ -58,6 +63,8 @@ Working with a coding agent? Ask it:
 5. Press **Send your changes**. On a touch device (phone, tablet) the share sheet opens; on a computer the list
    is copied to the clipboard. Paste it into a chat or an email to the author.
 
+<p><img src="docs/images/comment-en.png" width="440" alt="Comment mode on the room booking mockup: one comment is saved on the lead sentence, shown with a dotted underline, and a comment box with a question is open on the cancellation note."></p>
+
 The list looks like this. Comments come after the edits:
 
 ```
@@ -72,6 +79,10 @@ Spring menu draft — Wording changes
 3. Comment (whole page)
    Note: Shorter overall would be fine.
 ```
+
+A list pasted into a chat:
+
+<p><img src="docs/images/paste-en.png" width="440" alt="A chat where the reader has pasted the list of changes: two rewrites and one comment on the cancellation note."></p>
 
 Edits and comments are kept in that browser (localStorage) until they are reset, so the reader can close the page and come
 back. They are not shared with anyone until the reader sends the list.
@@ -120,6 +131,8 @@ NG: 2
 Unmarked: 3, 5
 ```
 
+<p><img src="docs/images/verdicts-en.png" width="440" alt="An acceptance checklist with OK, NG and Exception buttons under each of five items; items 1 and 4 are marked OK, item 2 NG, and 3 and 5 are unmarked."></p>
+
 The item's own text stays editable and commentable. **Undo all** also clears the verdicts.
 
 ## Pages with a strict Content-Security-Policy, or a single file
@@ -154,6 +167,14 @@ python3 fixwords.py log report.txt             # or: log - < report.txt
 python3 fixwords.py log report.txt --genre guide --doc 'Garden leaflet'
 python3 fixwords.py learn
 python3 fixwords.py stats
+```
+
+```mermaid
+flowchart LR
+  report["received report"] --> log["fixwords.py log"] --> store[("log")] --> learn["fixwords.py learn"]
+  learn --> digest["digest.md"] --> guide["style-guide.md<br>(LLM summary, reviewed by you)"] --> agent["your coding agent"]
+  learn --> cand["candidates.md"] --> decide{"accept / reject"} --> learn
+  learn --> prh["prh.yml"] --> lint["textlint"]
 ```
 
 The log and generated files live in `~/.local/share/fixwords/`, or `$FIXWORDS_HOME` when nonempty.
@@ -243,6 +264,8 @@ npm ci && npx playwright install chromium-headless-shell
 npm test                                                  # browser tests
 python3 -m unittest discover -s tests -p 'test_*.py'     # command tests
 ```
+
+The README images are regenerated with `node docs/images/capture.cjs`.
 
 ## License
 
