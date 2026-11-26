@@ -571,9 +571,9 @@ const activeId = p => p.evaluate(() => document.activeElement.id);
 async function openList(p) { await resetBtn(p).click(); await p.locator('#fixwords-list-title').waitFor(); }
 async function stored(p) { return p.evaluate(() => JSON.parse(localStorage.getItem('fixwords:' + location.pathname))); }
 const L = {
-  en: { title: 'Which change do you want to undo?', none: 'No changes yet', all: 'Undo all', restore: 'Restore', row: 'Undo',
+  en: { title: 'Which change do you want to undo?', close: 'Close', none: 'No changes yet', all: 'Undo all', restore: 'Restore', row: 'Undo',
     unsent: 'Changes: 2 · Not sent yet', orig: 'Baked daily', first: 'First line\nSecond line' },
-  ja: { title: 'どれを元に戻しますか', none: '直した箇所はありません', all: 'すべて元に戻す', restore: '取り消す', row: '元に戻す',
+  ja: { title: 'どれを元に戻しますか', close: '閉じる', none: '直した箇所はありません', all: 'すべて元に戻す', restore: '取り消す', row: '元に戻す',
     unsent: '2 か所を直しました ・ まだ送っていません', orig: '毎朝焼きます', first: '一行目\n二行目' }
 };
 for (const [name, viewport, extra] of [['desktop', { width: 1280, height: 800 }, {}], ['phone', { width: 390, height: 844 }, { hasTouch: true, isMobile: true }]]) {
@@ -649,19 +649,42 @@ test('revert one: the 取り消す notice goes away on close and the list closes
   assert.equal(await activeId(p), 'fixwords-reset');
   await done(p);
 });
-test('revert one: reverting the last text leaves an empty list, hides Undo all, focus goes to Restore and then to the title button', async () => {
-  const p = await open('en');
-  await start(p);
-  await edit(p, '#dup1', 'One');
-  await openList(p);
-  await rowsOf(p).nth(0).locator('button').click();
-  assert.equal(await p.locator('#fixwords-panel').textContent().then(x => x.includes('No changes yet')), true);
-  assert.equal(await p.locator('#fixwords-notice').isVisible(), true);
-  assert.equal(await p.locator('#fixwords-reset-all').isVisible(), false);
-  assert.equal(await activeId(p), 'fixwords-undo');
-  await p.keyboard.press('Escape');
-  assert.equal(await activeId(p), 'fixwords-title');
-  await done(p);
+test('revert one: reverting the last text hides the title, shows Close instead of an empty line, and Restore brings the title back', async () => {
+  for (const lang of ['en', 'ja']) {
+    const l = L[lang];
+    const p = await open(lang);
+    await start(p);
+    await edit(p, '#dup1', 'One');
+    await openList(p);
+    await rowsOf(p).nth(0).locator('button').click();
+    const panel = await p.locator('#fixwords-panel').innerText();
+    assert.equal(await p.locator('#fixwords-list-title').isVisible(), false);
+    assert.equal(panel.includes(l.title), false);
+    assert.equal(panel.includes(l.none), false);
+    assert.equal(await p.locator('#fixwords-notice').isVisible(), true);
+    assert.equal(await p.locator('#fixwords-reset-all').isVisible(), false);
+    const done_ = p.locator('#fixwords-list-done');
+    assert.equal(await done_.isVisible(), true);
+    assert.equal(await done_.textContent(), l.close);
+    const db = await done_.boundingBox(), pb = await p.locator('#fixwords-panel').boundingBox();
+    assert.ok(db.height >= 44 && db.width > pb.width * 0.8);
+    assert.equal(await activeId(p), 'fixwords-undo');
+    // The cross stays at the right edge of the header without the title beside it.
+    const xb = await p.locator('#fixwords-panel button[aria-label]').filter({ visible: true }).first().boundingBox();
+    assert.ok(xb.x + xb.width > pb.x + pb.width - 40);
+    // The notice reads as a status line, not as another boxed row.
+    assert.equal(await p.locator('#fixwords-notice').evaluate(n => getComputedStyle(n).backgroundColor), 'rgba(0, 0, 0, 0)');
+    await p.getByRole('button', { name: l.restore, exact: true }).click();
+    assert.equal(await p.locator('#fixwords-list-title').isVisible(), true);
+    assert.equal(await p.locator('#fixwords-list-title').textContent(), l.title);
+    assert.equal(await done_.isVisible(), false);
+    assert.equal(await rowsOf(p).count(), 1);
+    await rowsOf(p).nth(0).locator('button').click();
+    await done_.click();
+    assert.equal(await p.locator('#fixwords-panel').isVisible(), false);
+    assert.equal(await activeId(p), 'fixwords-title');
+    await done(p);
+  }
 });
 test('revert one: handed-off status returns after Restore; a row revert makes it unsent', async () => {
   const p = await open('en', { permissions: ['clipboard-read', 'clipboard-write'] });
@@ -752,12 +775,28 @@ test('revert one with comments: rows list edits only, notes stay on row revert, 
   assert.equal(await p.locator('#dup1').textContent(), 'Baked daily');
   assert.equal((await stored(p)).notes.length, 1);
   assert.equal(await p.locator('#fixwords-reset-all').isVisible(), true);
-  assert.ok((await p.locator('#fixwords-panel').textContent()).includes('No changes yet'));
+  // Comments remain, so Undo all stays beside Close; the question title is gone with the rows.
+  assert.equal(await p.locator('#fixwords-list-title').isVisible(), false);
+  assert.equal(await p.locator('#fixwords-list-done').isVisible(), true);
   p.once('dialog', async d => { await d.accept(); });
   await p.locator('#fixwords-reset-all').click();
   assert.equal((await stored(p)).notes, undefined);
   assert.equal(await p.locator('#dup2').getAttribute('data-fixwords-noted'), null);
   assert.equal(await p.locator('#fixwords-panel').isVisible(), false);
+  await done(p);
+});
+test('revert one: a list opened with comments only has no title and focuses Close', async () => {
+  const p = await open('en');
+  await start(p);
+  await commentToggle(p).click();
+  await p.locator('#dup2').click();
+  await p.locator('#fixwords-note-input').fill('Why?'); await p.keyboard.press('Control+Enter');
+  await commentToggle(p).click();
+  await resetBtn(p).click(); await p.locator('#fixwords-list-done').waitFor();
+  assert.equal(await rowsOf(p).count(), 0);
+  assert.equal(await p.locator('#fixwords-list-title').isVisible(), false);
+  assert.equal(await p.locator('#fixwords-reset-all').isVisible(), true);
+  assert.equal(await activeId(p), 'fixwords-list-done');
   await done(p);
 });
 test('revert one: opening a comment or label closes the list, bar button hidden when nothing to undo', async () => {
