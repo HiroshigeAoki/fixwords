@@ -124,6 +124,8 @@ async function commentShot(browser, lang) {
   assert(await page.locator('#fixwords-comment[aria-pressed=true]').count() === 1, 'comment mode is on');
   await comment(page, `p:text-is("${s.intro}")`, s.question, true);
   assert(await page.locator(`p:text-is("${s.intro}")[data-fixwords-noted]`).count() === 1, 'saved comment has the dotted underline attribute');
+  // Leave room under the last paragraph so the comment box opens below it instead of over the figure.
+  await page.addStyleTag({ content: 'body { padding-bottom: 120px; }' });
   await comment(page, `p:text-is("${s.other}")`, s.otherNote, false);
   const box = page.locator('#fixwords-note-input');
   assert(await box.isVisible() && await box.inputValue() === s.otherNote, 'comment box is open with the note typed');

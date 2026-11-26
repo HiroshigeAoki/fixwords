@@ -4,7 +4,7 @@
 
 Let the people you shared a page with fix its wording themselves.
 
-<p><img src="docs/images/edit-en.png" width="440" alt="A room booking mockup in edit mode. The lead sentence and a label in the figure were rewritten and are highlighted, and the fixwords bar at the bottom shows "Changes: 2"."></p>
+<p><img src="docs/images/edit-en.png" width="440" alt="A room booking mockup in edit mode. The lead sentence and a label in the figure were rewritten and are highlighted, and the fixwords bar at the bottom shows 2 changes."></p>
 
 You made a mockup or a draft page (perhaps with an AI coding agent) and sent it to colleagues who do not write
 code. They spot wording they would change. With fixwords on the page they rewrite the text right where they see
@@ -75,7 +75,7 @@ Spring menu draft — Wording changes
    Note: Shorter overall would be fine.
 ```
 
-Pasted into a chat:
+A list pasted into a chat:
 
 <p><img src="docs/images/paste-en.png" width="440" alt="A chat where the reader has pasted the list of changes: two rewrites and one comment on the cancellation note."></p>
 
