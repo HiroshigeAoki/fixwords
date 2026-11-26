@@ -57,7 +57,25 @@
     "commentOn": "コメント（対象：{text}）",
     "commentPage": "コメント（ページ全体）",
     "noteLine": "   内容：{text}",
-    "genre": "種類：{genre}"
+    "genre": "種類：{genre}",
+    "listTitle": "どれを元に戻しますか",
+    "listLabel": "元に戻す箇所を選ぶ",
+    "rowUndo": "元に戻す",
+    "restore": "取り消す",
+    "resetAll": "すべて元に戻す",
+    "noList": "直した箇所はありません",
+    "locFigure": "図の文字",
+    "locHeading": "見出し「{heading}」の下",
+    "locOccurrence": "{index}か所目／全{total}か所",
+    "locJoin": "・",
+    "revertedAt": "{where}を元に戻しました",
+    "revertedOne": "1か所",
+    "was": "元：",
+    "now": "新：",
+    "emptied": "（空）",
+    "rowLabel": "「{text}」を元に戻す{where}",
+    "rowLabelEmpty": "空にした「{text}」を元に戻す{where}",
+    "whereWrap": "（{where}）"
   },
   "en": {
     "startIdle": "✎ Fix wording",
@@ -113,7 +131,25 @@
     "commentOn": "Comment on: {text}",
     "commentPage": "Comment (whole page)",
     "noteLine": "   Note: {text}",
-    "genre": "Type: {genre}"
+    "genre": "Type: {genre}",
+    "listTitle": "Which change do you want to undo?",
+    "listLabel": "Choose a change to undo",
+    "rowUndo": "Undo",
+    "restore": "Restore",
+    "resetAll": "Undo all",
+    "noList": "No changes yet",
+    "locFigure": "Figure text",
+    "locHeading": "Under “{heading}”",
+    "locOccurrence": "occurrence {index} of {total}",
+    "locJoin": "; ",
+    "revertedAt": "{where} was undone",
+    "revertedOne": "1 change",
+    "was": "Before: ",
+    "now": "Now: ",
+    "emptied": "(empty)",
+    "rowLabel": "Undo “{text}”{where}",
+    "rowLabelEmpty": "Undo the emptied “{text}”{where}",
+    "whereWrap": " ({where})"
   }
 };
   function boot() {
@@ -180,6 +216,14 @@
     else if (value === it.original) it.node.textContent = it.raw;
     else write(it.node, it.raw.match(/^\s*/)[0] + value + it.raw.match(/\s*$/)[0]);
   }
+  // Saved and undone texts have no edge spaces; an HTML element keeps its current ones around them.
+  function writeBack(it, value) {
+    if (it.svg) put(it, value);
+    else {
+      var raw = read(it.node);
+      write(it.node, raw.match(/^ */)[0] + value + raw.match(/ *$/)[0]);
+    }
+  }
   function isLabel(node) {
     return (node.localName === "text" || (node.localName === "tspan" && node.closest("text"))) &&
       !node.closest("defs,symbol,clipPath,mask,pattern,marker") &&
@@ -242,10 +286,7 @@
     if (!saved || saved.v !== 1 || !Array.isArray(saved.edits)) return;
     saved.edits.some(function (edit) {
       if (edit && edit.o === it.original && !!edit.s === it.svg && edit.i === it.index && edit.n === it.total && typeof edit.t === "string") {
-        // Saved text is trimmed; keep the element's own edge spaces (they separate it from its neighbours).
-        var raw = read(it.node);
-        if (it.svg) put(it, edit.t);
-        else write(it.node, raw.match(/^ */)[0] + edit.t + raw.match(/ *$/)[0]);
+        writeBack(it, edit.t);
         return true;
       }
       return false;
@@ -318,7 +359,7 @@
   function unsent() { return total() > 0 && hash(report()) !== sent; }
   var css = document.createElement("style");
   css.textContent =
-    "#fixwords-svg-input,#fixwords-note-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#fff;--ink:#191d22;--edge:rgba(25,29,34,.24);--accent:#0b6e66;--accent-ink:#fff;--amber:#b45309;--muted:#535b65;box-sizing:border-box;position:fixed;right:14px;bottom:14px;z-index:2147483000;background:var(--surface);color:var(--ink);border:1px solid var(--edge);box-shadow:0 4px 24px rgba(0,0,0,.28);font:500 15px/1.5 'Hiragino Sans','Yu Gothic','Noto Sans CJK JP',sans-serif}" +
+    "#fixwords-svg-input,#fixwords-note-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#fff;--ink:#191d22;--edge:rgba(25,29,34,.24);--accent:#0b6e66;--accent-ink:#fff;--amber:#b45309;--danger:#b42318;--muted:#535b65;box-sizing:border-box;position:fixed;right:14px;bottom:14px;z-index:2147483000;background:var(--surface);color:var(--ink);border:1px solid var(--edge);box-shadow:0 4px 24px rgba(0,0,0,.28);font:500 15px/1.5 'Hiragino Sans','Yu Gothic','Noto Sans CJK JP',sans-serif}" +
     "#fixwords-bar,#fixwords-panel{width:min(440px,calc(100vw - 28px));padding:12px;border-radius:16px;opacity:0;transform:translateY(8px);transition:opacity 200ms cubic-bezier(.23,1,.32,1),transform 200ms cubic-bezier(.23,1,.32,1)}" +
     "#fixwords-bar[data-visible],#fixwords-panel[data-visible]{opacity:1;transform:translateY(0)}" +
     "#fixwords-bar button,#fixwords-panel button,#fixwords-handle{box-sizing:border-box;min-width:44px;min-height:44px;font:inherit;border:0;border-radius:10px;background:transparent;color:inherit;padding:8px 12px;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:transform 120ms cubic-bezier(.23,1,.32,1)}" +
@@ -333,8 +374,11 @@
     "#fixwords-handle{width:48px;height:48px;padding:0;border-radius:50%;opacity:1;background:var(--accent);color:var(--accent-ink);font-size:20px;border-color:var(--surface)}#fixwords-bar[data-sheet]{display:none}#fixwords-badge{position:absolute;right:-6px;top:-8px;min-width:22px;padding:1px 4px;border-radius:12px;background:var(--amber);color:var(--surface);font-size:12px}" +
     "#fixwords-panel{overflow-y:auto;overscroll-behavior:contain}#fixwords-note{white-space:pre-line;overflow-wrap:anywhere}#fixwords-note[data-mode=copied]:first-line{font-size:20px;font-weight:600}" +
     "#fixwords-panel textarea{box-sizing:border-box;display:block;width:100%;font:400 16px/1.5 'Hiragino Sans','Yu Gothic','Noto Sans CJK JP',sans-serif;margin:12px 0;padding:8px;border:1px solid var(--edge);border-radius:8px;background:var(--surface);color:var(--ink);resize:vertical;overflow:auto}" +
+    "#fixwords-list-top{position:sticky;top:-12px;z-index:1;margin-top:-12px;padding:12px 0 8px;background:var(--surface)}#fixwords-list-header{display:flex;align-items:center;justify-content:space-between;gap:8px}#fixwords-list-title{font-weight:600;min-width:0}" +
+    "#fixwords-panel .fixwords-row{border-top:1px solid var(--edge);padding:12px 0;overflow-wrap:anywhere}#fixwords-panel .fixwords-location{color:var(--muted);font-size:13px}#fixwords-panel .fixwords-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere;margin:6px 0}#fixwords-panel del{color:var(--muted);text-decoration:line-through}#fixwords-panel .fixwords-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}" +
+    "#fixwords-panel .fixwords-row button{border:1px solid var(--edge)}#fixwords-notice{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border-radius:10px;background:rgba(127,127,127,.12);overflow-wrap:anywhere}#fixwords-notice-text{flex:1;min-width:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}#fixwords-panel #fixwords-undo{flex:none;border:1px solid var(--accent);color:var(--accent)}#fixwords-panel #fixwords-reset-all{color:var(--danger)}" +
     "body.fixwords-editing [data-fixwords-editable]{outline:1px dashed #e0a200;outline-offset:3px}body.fixwords-editing [data-fixwords-editable]:focus{outline:2px solid #e0a200;background:rgba(224,162,0,.14)}body.fixwords-editing [data-fixwords-changed]{box-shadow:inset 0 -3px 0 #e0a200}body.fixwords-show-changes [data-fixwords-changed]{background:rgba(255,214,10,.55);outline:2px solid #e0a200;outline-offset:2px;color:#000}" +
-    "@media(prefers-color-scheme:dark){#fixwords-svg-input,#fixwords-note-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#1f2329;--ink:#f2f4f6;--edge:rgba(242,244,246,.3);--accent:#35b3a7;--accent-ink:#191d22;--amber:#fbbf24;--muted:#bdc4cd}}" +
+    "@media(prefers-color-scheme:dark){#fixwords-svg-input,#fixwords-note-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#1f2329;--ink:#f2f4f6;--edge:rgba(242,244,246,.3);--accent:#35b3a7;--accent-ink:#191d22;--amber:#fbbf24;--danger:#f97066;--muted:#bdc4cd}}" +
     "@media(hover:hover) and (pointer:fine){#fixwords-bar button:hover,#fixwords-panel button:hover,#fixwords-handle:hover{box-shadow:inset 0 0 0 2px var(--accent)}body.fixwords-editing [data-fixwords-editable]{cursor:text}}" +
     "@media(max-width:600px){#fixwords-bar:not([data-idle]),#fixwords-panel{right:0;bottom:0;width:100%;border-radius:16px 16px 0 0;padding-bottom:max(12px,env(safe-area-inset-bottom,0px));padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}}" +
     ".fixwords-box{fill:none;stroke:#e0a200;stroke-dasharray:3 2;vector-effect:non-scaling-stroke;pointer-events:none}.fixwords-box.changed{fill:rgba(224,162,0,.16);stroke-dasharray:none}" +
@@ -362,20 +406,37 @@
   var send = button("", content, "send");
   var secondary = element("div", "secondary", content);
   var toggle = button(t("continue"), secondary);
-  var reset = button(t("reset"), secondary);
+  var reset = button(t("reset"), secondary, "reset");
   var commentBtn = button(t("comment"), secondary, "comment");
   var pageBtn = button(t("pageComment"), secondary, "pagenote"); pageBtn.hidden = true;
   var handle = button(t("iconEdit"), document.body, "handle");
   var badge = element("span", "badge", handle); badge.setAttribute("aria-hidden", "true");
   var panel = element("div", "panel", document.body); panel.hidden = true;
   panel.setAttribute("role", "region"); panel.setAttribute("aria-label", t("sendLabel"));
-  var note = element("div", "note", panel); note.setAttribute("role", "status");
-  var area = element("textarea", "", panel); area.readOnly = true; area.rows = 5; area.setAttribute("aria-label", t("reportLabel"));
-  var actions = element("div", "actions", panel);
+  var sendView = element("div", "", panel);
+  var note = element("div", "note", sendView); note.setAttribute("role", "status");
+  var area = element("textarea", "", sendView); area.readOnly = true; area.rows = 5; area.setAttribute("aria-label", t("reportLabel"));
+  var actions = element("div", "actions", sendView);
   var again = button(t("copyAgain"), actions);
   var share = button(t("share"), actions); try { share.hidden = typeof navigator.share !== "function"; } catch (e) { share.hidden = true; }
   var manual = button(t("manualDone"), actions); manual.hidden = true;
   var dismiss = button(t("close"), actions);
+  var listView = element("div", "", panel); listView.hidden = true;
+  // The title and the notice stay in view while the rows scroll under them.
+  var listTop = element("div", "list-top", listView);
+  var listHeader = element("div", "list-header", listTop);
+  // Not an h2: the page's own heading styles would reach it.
+  var listTitle = element("div", "list-title", listHeader, t("listTitle")); listTitle.tabIndex = -1;
+  listTitle.setAttribute("role", "heading"); listTitle.setAttribute("aria-level", "2");
+  var listClose = button(t("iconClose"), listHeader); listClose.setAttribute("aria-label", t("close"));
+  // Screen readers get the notice from a live region that is always rendered while the list is open.
+  var live = element("span", "", listTop); live.className = "fixwords-sr"; live.setAttribute("role", "status");
+  var notice = element("div", "notice", listTop); notice.hidden = true;
+  var noticeText = element("span", "notice-text", notice); noticeText.setAttribute("aria-hidden", "true");
+  var undo = button(t("restore"), notice, "undo");
+  var rows = element("div", "", listView);
+  var resetAll = button(t("resetAll"), listView, "reset-all");
+  var undoSlot = null, revertedAt = 0;
   var spacer = element("div", "spacer"); spacer.setAttribute("aria-hidden", "true");
   function reveal(node) {
     if (!node.hidden && node.hasAttribute("data-visible")) return;
@@ -390,6 +451,8 @@
       spacer.style.height = bar.offsetHeight + "px";
     } else if (spacer.parentNode) spacer.parentNode.removeChild(spacer);
     panel.style.maxHeight = Math.max(80, window.innerHeight - 28) + "px";
+    // A button that takes focus is scrolled clear of the pinned list top, not under it.
+    panel.style.scrollPaddingTop = listView.hidden ? "" : listTop.offsetHeight + "px";
   }
   function render() {
     var e = changes().length, m = noteCount(), n = e + m, pending = n && unsent(), idle = !editing && !n;
@@ -477,7 +540,8 @@
     if (focus) it.node.focus();
   }
   function openSvg(it) {
-    finishSvg(false, false);
+    // Opening a label closes the sheet, as an edit on the page does.
+    finishSvg(false, false); hideSheet();
     svgItem = it; svgInput = element("input", "svg-input", document.body);
     svgInput.type = "text"; svgInput.setAttribute("aria-label", t("svgLabel"));
     svgInput.value = text(it.node);
@@ -507,7 +571,7 @@
     if (focus) (target.page ? pageBtn : target.item.node).focus();
   }
   function openNote(target) {
-    finishNote(false, false);
+    finishNote(false, false); hideSheet();
     noteTarget = target; noteInput = element("textarea", "note-input", document.body);
     noteInput.rows = 3; noteInput.setAttribute("aria-label", t("noteLabel"));
     noteInput.value = target.page ? pageNote : target.item.note;
@@ -560,15 +624,77 @@
     });
     mark(); render();
   }
+  function locationLabel(it) {
+    var parts = [];
+    if (it.svg) parts.push(t("locFigure"));
+    if (it.heading) parts.push(t("locHeading", { heading: it.heading }));
+    if (it.total > 1) parts.push(t("locOccurrence", { index: it.index, total: it.total }));
+    return parts.join(t("locJoin"));
+  }
+  function cut(s, n) {
+    if (s.length <= n) return s;
+    s = s.slice(0, n);
+    return (/[\ud800-\udbff]$/.test(s) ? s.slice(0, -1) : s) + "…";
+  }
+  function setUndo(slot) {
+    undoSlot = slot;
+    notice.hidden = !slot;
+    noticeText.textContent = live.textContent = slot ? t("revertedAt", { where: locationLabel(slot.item) || t("revertedOne") }) : "";
+  }
+  // focusAt: the row whose button takes focus (the next one after a revert); none on opening.
+  function rebuildList(focusAt) {
+    rows.textContent = "";
+    var changed = changes(), buttons = [];
+    resetAll.hidden = !total();
+    if (!changed.length) element("div", "", rows, t("noList"));
+    changed.forEach(function (it, i) {
+      var row = element("div", "", rows); row.className = "fixwords-row";
+      var loc = locationLabel(it);
+      if (loc) element("div", "", row, loc).className = "fixwords-location";
+      element("span", "", row, t("was")).className = "fixwords-sr";
+      element("del", "", row, it.original.replace(/\n/g, t("lineSeparator"))).className = "fixwords-text";
+      var current = text(it.node).replace(/\n/g, t("lineSeparator"));
+      element("span", "", row, t("now")).className = "fixwords-sr";
+      element("div", "", row, current || t("emptied")).className = "fixwords-text";
+      var revert = button(t("rowUndo"), row);
+      revert.setAttribute("aria-label", t(current ? "rowLabel" : "rowLabelEmpty", {
+        text: cut(current || it.original.replace(/\n/g, t("lineSeparator")), 20), where: loc ? t("whereWrap", { where: loc }) : "" }));
+      revert.addEventListener("click", function () {
+        // The next row moves under the pointer: a double click must not revert it too.
+        if (Date.now() - revertedAt < 500) return;
+        revertedAt = Date.now();
+        setUndo({ item: it, text: text(it.node) });
+        writeBack(it, it.original); persist(); mark(); rebuildList(i);
+      });
+      buttons.push(revert);
+    });
+    if (focusAt == null) listTitle.focus({ preventScroll: true });
+    else (buttons[Math.min(focusAt, buttons.length - 1)] || (undoSlot ? undo : listTitle)).focus();
+  }
+  function showList() { revertedAt = 0; openPanel(listView, t("listLabel")); rebuildList(); }
+  listClose.addEventListener("click", function () { hideSheet(true); });
+  undo.addEventListener("click", function () {
+    var slot = undoSlot;
+    if (!slot) return;
+    revertedAt = 0; setUndo(null); writeBack(slot.item, slot.text);
+    persist(); mark(); rebuildList(changes().indexOf(slot.item));
+  });
   function hideSheet(restoreFocus) {
-    var wasOpen = !panel.hidden;
+    var wasOpen = !panel.hidden, wasList = !listView.hidden;
+    setUndo(null);
     bar.removeAttribute("data-sheet"); panel.hidden = true; panel.removeAttribute("data-visible");
     document.body.classList.remove("fixwords-show-changes"); render();
-    if (wasOpen && restoreFocus === true) send.focus();
+    if (wasOpen && restoreFocus === true) (wasList ? (!reset.hidden && !closed ? reset : start) : send).focus();
+  }
+  function openPanel(view, label) {
+    setUndo(null);
+    sendView.hidden = view !== sendView; listView.hidden = view !== listView;
+    panel.setAttribute("aria-label", label);
+    bar.setAttribute("data-sheet", ""); reveal(panel);
+    document.body.classList.add("fixwords-show-changes"); mark(); layout();
   }
   function showSheet(value) {
-    sheetText = value; area.value = value; bar.setAttribute("data-sheet", ""); reveal(panel);
-    document.body.classList.add("fixwords-show-changes"); mark(); layout();
+    sheetText = value; area.value = value; openPanel(sendView, t("sendLabel"));
     var changed = changes();
     if (changed.length) changed[0].node.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
   }
@@ -662,10 +788,13 @@
   reset.addEventListener("pointerdown", function () { finishSvg(true, false); finishNote(true, false); });
   reset.addEventListener("click", function () {
     finishSvg(true, false); finishNote(true, false);
+    if (total()) showList();
+  });
+  resetAll.addEventListener("click", function () {
     if (!total() || !window.confirm(t("confirm"))) return;
-    items.forEach(function (it) { put(it, it.original); it.note = ""; });
+    items.forEach(function (it) { writeBack(it, it.original); it.note = ""; });
     pageNote = "";
-    sent = ""; hideSheet(); persist(); mark();
+    sent = ""; hideSheet(true); persist(); mark();
   });
   window.addEventListener("beforeunload", function (e) { if (unsent()) { e.preventDefault(); e.returnValue = ""; } });
   window.addEventListener("resize", function () { layout(); placeSvg(); placeNote(); });

@@ -93,12 +93,13 @@ test('editing, both reports, persistence, folding, reset and exclusions', async 
     assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('fixwords:' + location.pathname)).closed), true);
     await p.locator('#fixwords-handle').click();
     assert.equal(await p.locator('#fixwords-bar').isVisible(), true);
-    // Declining the confirm dialog leaves the edits alone.
-    p.once('dialog', async d => { await d.dismiss(); });
+    // The reset button opens the list; declining the confirm dialog of "Undo all" leaves the edits alone.
     await p.getByRole('button', {name: lang === 'en' ? 'Reset changes' : '元に戻す', exact:true}).click();
+    p.once('dialog', async d => { await d.dismiss(); });
+    await p.getByRole('button', {name: lang === 'en' ? 'Undo all' : 'すべて元に戻す', exact:true}).click();
     assert.equal(await p.locator('#dup2').textContent(), 'Fresh bread');
     p.once('dialog', async d => { assert.equal(d.type(), 'confirm'); assert.equal(d.message(), lang === 'en' ? 'Reset all your wording changes?' : '直した文言をすべて元に戻します。よろしいですか？'); await d.accept(); });
-    await p.getByRole('button', {name: lang === 'en' ? 'Reset changes' : '元に戻す', exact:true}).click();
+    await p.getByRole('button', {name: lang === 'en' ? 'Undo all' : 'すべて元に戻す', exact:true}).click();
     assert.equal(await p.locator('#dup2').textContent(), lang === 'en' ? 'Baked daily' : '毎朝焼きます');
     assert.equal(await p.locator('#label').textContent(), lang === 'en' ? 'Packing' : '袋詰め');
     await done(p);
@@ -412,8 +413,9 @@ test('comments: SVG labels, page note, report, reset and counts in Japanese', as
   assert.equal(await sendReport(p), 'パンのかご 文言の直し\n\n1. （図）コメント（対象：袋詰め）\n   内容：袋なのはなぜ？\n\n2. （図）コメント（対象：できあがり）（2か所目／全2か所・見出し「今日のメニュー」の下）\n   内容：二つ目\n\n3. コメント（ページ全体）\n   内容：全体に短く');
   assert.equal(await p.locator('#fixwords-status').textContent(), '直し 0 か所・コメント 3 件 ・ 送る文章はコピー済みです');
   await p.keyboard.press('Escape');
-  p.once('dialog', async d => { await d.accept(); });
   await p.getByRole('button', { name: '元に戻す', exact: true }).click();
+  p.once('dialog', async d => { await d.accept(); });
+  await p.getByRole('button', { name: 'すべて元に戻す', exact: true }).click();
   assert.equal(await p.locator('#label').getAttribute('data-fixwords-noted'), null);
   assert.equal(await p.locator('svg rect.fixwords-box.noted').count(), 0);
   assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('fixwords:' + location.pathname)).notes), undefined);
@@ -436,6 +438,216 @@ test('comments: phone width, textarea stays in view, noted text survives an edit
   await p.reload();
   assert.equal(await p.locator('#dup1').textContent(), 'Fresh bread');
   assert.equal(await p.locator('#dup1').getAttribute('data-fixwords-noted'), '');
+  await done(p);
+});
+
+
+// Revert one edit from a list.
+const resetBtn = p => p.locator('#fixwords-reset');
+const rowsOf = p => p.locator('#fixwords-panel .fixwords-row');
+const activeId = p => p.evaluate(() => document.activeElement.id);
+async function openList(p) { await resetBtn(p).click(); await p.locator('#fixwords-list-title').waitFor(); }
+async function stored(p) { return p.evaluate(() => JSON.parse(localStorage.getItem('fixwords:' + location.pathname))); }
+const L = {
+  en: { title: 'Which change do you want to undo?', none: 'No changes yet', all: 'Undo all', restore: 'Restore', row: 'Undo',
+    unsent: 'Changes: 2 · Not sent yet', orig: 'Baked daily', first: 'First line\nSecond line' },
+  ja: { title: 'どれを元に戻しますか', none: '直した箇所はありません', all: 'すべて元に戻す', restore: '取り消す', row: '元に戻す',
+    unsent: '2 か所を直しました ・ まだ送っていません', orig: '毎朝焼きます', first: '一行目\n二行目' }
+};
+for (const [name, viewport, extra] of [['desktop', { width: 1280, height: 800 }, {}], ['phone', { width: 390, height: 844 }, { hasTouch: true, isMobile: true }]]) {
+  test('revert one: list opens without changes, rows, revert second of three, undo, close (' + name + ')', async () => {
+    for (const lang of ['en', 'ja']) {
+      const l = L[lang];
+      const p = await open(lang, { viewport, ...extra, permissions: ['clipboard-read', 'clipboard-write'] });
+      await start(p);
+      await edit(p, '#dup1', 'One'); await edit(p, '#dup2', 'Two'); await edit(p, '#lines', 'Three');
+      const before = await stored(p);
+      await openList(p);
+      assert.deepEqual(await stored(p), before);
+      assert.equal(await p.locator('#dup2').textContent(), 'Two');
+      assert.equal(await p.locator('#fixwords-list-title').textContent(), l.title);
+      assert.equal(await activeId(p), 'fixwords-list-title');
+      assert.equal(await p.locator('#fixwords-panel').getAttribute('aria-label'), lang === 'en' ? 'Choose a change to undo' : '元に戻す箇所を選ぶ');
+      assert.equal(await rowsOf(p).count(), 3);
+      const row = rowsOf(p).nth(1);
+      assert.equal(await row.locator('del').textContent(), l.orig);
+      assert.equal(await row.locator('.fixwords-location').textContent(), lang === 'en' ? 'Under “Our menu”; occurrence 2 of 2' : '見出し「今日のメニュー」の下・2か所目／全2か所');
+      const rb = await row.locator('button').boundingBox();
+      assert.ok(rb.width >= 44 && rb.height >= 44);
+      assert.equal(await row.locator('button').textContent(), l.row);
+      assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      await row.locator('button').click();
+      assert.equal(await p.locator('#dup2').textContent(), l.orig);
+      assert.equal(await p.locator('#dup1').textContent(), 'One');
+      assert.equal(await p.locator('#lines').textContent(), 'Three');
+      assert.equal(await p.locator('#dup1').getAttribute('data-fixwords-changed'), '');
+      assert.equal(await p.locator('#dup2').getAttribute('data-fixwords-changed'), null);
+      assert.deepEqual((await stored(p)).edits.map(e => e.t), ['One', 'Three']);
+      assert.equal(await rowsOf(p).count(), 2);
+      assert.equal(await p.locator('#fixwords-notice').isVisible(), true);
+      assert.match(await p.locator('#fixwords-notice').textContent(), lang === 'en' ? /Under “Our menu”; occurrence 2 of 2 was undone/ : /見出し「今日のメニュー」の下・2か所目／全2か所を元に戻しました/);
+      assert.equal(await activeId(p), '');
+      assert.equal(await p.evaluate(() => document.activeElement.closest('.fixwords-row') !== null), true);
+      // Restore brings it back.
+      await p.getByRole('button', { name: l.restore, exact: true }).click();
+      assert.equal(await p.locator('#dup2').textContent(), 'Two');
+      assert.equal(await p.locator('#fixwords-notice').isVisible(), false);
+      assert.deepEqual((await stored(p)).edits.map(e => e.t), ['One', 'Two', 'Three']);
+      // Revert again, report and status after closing.
+      await rowsOf(p).nth(1).locator('button').click();
+      assert.equal(await p.locator('#fixwords-notice').isVisible(), true);
+      await p.locator('#fixwords-panel button[aria-label]').first().click();
+      assert.equal(await p.locator('#fixwords-panel').isVisible(), false);
+      assert.equal(await activeId(p), 'fixwords-reset');
+      assert.equal(await p.locator('#fixwords-status').textContent(), l.unsent);
+      assert.equal(await sendReport(p), lang === 'en'
+        ? 'Bread basket — Wording changes\n\n1. Before (occurrence 1 of 2; under “Our menu”): Baked daily\n   After: One\n\n2. Before: First line / Second line\n   After: Three'
+        : 'パンのかご 文言の直し\n\n1. 元（1か所目／全2か所・見出し「今日のメニュー」の下）：毎朝焼きます\n   新：One\n\n2. 元：一行目 ／ 二行目\n   新：Three');
+      await p.keyboard.press('Escape');
+      // Reopening shows no notice.
+      await openList(p);
+      assert.equal(await p.locator('#fixwords-notice').isVisible(), false);
+      await done(p);
+    }
+  });
+}
+test('revert one: the 取り消す notice goes away on close and the list closes with Escape and the cross', async () => {
+  const p = await open('ja');
+  await start(p);
+  await edit(p, '#dup1', 'One'); await edit(p, '#dup2', 'Two');
+  await openList(p);
+  await rowsOf(p).nth(0).locator('button').click();
+  assert.equal(await p.locator('#fixwords-notice').isVisible(), true);
+  await p.keyboard.press('Escape');
+  assert.equal(await p.locator('#fixwords-panel').isVisible(), false);
+  assert.equal(await activeId(p), 'fixwords-reset');
+  await openList(p);
+  assert.equal(await p.locator('#fixwords-notice').isVisible(), false);
+  await p.locator('#fixwords-panel button[aria-label="閉じる"]').first().click();
+  assert.equal(await activeId(p), 'fixwords-reset');
+  await done(p);
+});
+test('revert one: reverting the last text leaves an empty list, hides Undo all, focus goes to Restore and then to the title button', async () => {
+  const p = await open('en');
+  await start(p);
+  await edit(p, '#dup1', 'One');
+  await openList(p);
+  await rowsOf(p).nth(0).locator('button').click();
+  assert.equal(await p.locator('#fixwords-panel').textContent().then(x => x.includes('No changes yet')), true);
+  assert.equal(await p.locator('#fixwords-notice').isVisible(), true);
+  assert.equal(await p.locator('#fixwords-reset-all').isVisible(), false);
+  assert.equal(await activeId(p), 'fixwords-undo');
+  await p.keyboard.press('Escape');
+  assert.equal(await activeId(p), 'fixwords-title');
+  await done(p);
+});
+test('revert one: handed-off status returns after Restore; a row revert makes it unsent', async () => {
+  const p = await open('en', { permissions: ['clipboard-read', 'clipboard-write'] });
+  await start(p);
+  await edit(p, '#dup1', 'One'); await edit(p, '#dup2', 'Two');
+  await sendReport(p);
+  assert.equal(await p.locator('#fixwords-status').textContent(), 'Changes: 2 · Copied');
+  await p.keyboard.press('Escape');
+  await openList(p);
+  await rowsOf(p).nth(1).locator('button').click();
+  assert.equal((await stored(p)).sent.length > 0, true);
+  await p.getByRole('button', { name: 'Restore', exact: true }).click();
+  await p.keyboard.press('Escape');
+  assert.equal(await p.locator('#fixwords-status').textContent(), 'Changes: 2 · Copied');
+  await openList(p);
+  await rowsOf(p).nth(1).locator('button').click();
+  await p.keyboard.press('Escape');
+  assert.equal(await p.locator('#fixwords-status').textContent(), 'Changes: 1 · Not sent yet');
+  await done(p);
+});
+test('revert one: double click reverts only one row, Undo all confirm accept and cancel, sent cleared', async () => {
+  const p = await open('en', { permissions: ['clipboard-read', 'clipboard-write'] });
+  await start(p);
+  await edit(p, '#dup1', 'One'); await edit(p, '#dup2', 'Two');
+  await sendReport(p); await p.keyboard.press('Escape');
+  await openList(p);
+  await p.evaluate(() => { const b = document.querySelector('.fixwords-row button'); b.click(); document.querySelector('.fixwords-row button').click(); });
+  assert.equal(await rowsOf(p).count(), 1);
+  assert.equal(await p.locator('#dup2').textContent(), 'Two');
+  p.once('dialog', async d => { assert.equal(d.message(), 'Reset all your wording changes?'); await d.dismiss(); });
+  await p.locator('#fixwords-reset-all').click();
+  assert.equal(await p.locator('#dup2').textContent(), 'Two');
+  assert.equal(await p.locator('#fixwords-panel').isVisible(), true);
+  p.once('dialog', async d => { await d.accept(); });
+  await p.locator('#fixwords-reset-all').click();
+  assert.equal(await p.locator('#dup2').textContent(), 'Baked daily');
+  assert.equal(await p.locator('#fixwords-panel').isVisible(), false);
+  assert.equal((await stored(p)).sent, undefined);
+  await done(p);
+});
+test('revert one: SVG label rows (also with the label input open), tspan neighbours and HTML edge spaces are kept', async () => {
+  const p = await open('en');
+  await p.route('**/edge.html', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body:
+    '<html lang="en"><head><title>T</title></head><body><h1>T</h1><p>a<span id="s"> Hello </span>b</p>' +
+    '<svg viewBox="0 0 200 60" width="200"><text x="5" y="20"><tspan id="t1"> Left </tspan><tspan id="t2">Right</tspan></text></svg>' +
+    '<script src="/fixwords.js"></script></body></html>' }));
+  await p.goto(env.base + '/edge.html');
+  await p.evaluate(() => localStorage.setItem('fixwords:/edge.html', JSON.stringify({ v: 1, closed: false, edits: [{ o: 'Hello', i: 1, n: 1, t: 'Hi' }] })));
+  await p.reload();
+  assert.equal(await p.locator('#s').evaluate(n => n.textContent), ' Hi ');
+  await start(p);
+  await p.locator('#t1').click();
+  await p.locator('#fixwords-svg-input').fill('Changed'); await p.keyboard.press('Enter');
+  assert.equal(await p.locator('#t1').evaluate(n => n.textContent), ' Changed ');
+  await p.locator('#t1').click();
+  await p.locator('#fixwords-svg-input').fill('Typing');
+  await resetBtn(p).click();
+  await p.locator('#fixwords-list-title').waitFor();
+  assert.equal(await p.locator('#fixwords-svg-input').count(), 0);
+  assert.equal(await rowsOf(p).count(), 2);
+  assert.equal(await rowsOf(p).nth(1).locator('.fixwords-location').textContent(), 'Figure text; Under “T”');
+  await rowsOf(p).nth(1).locator('button').click();
+  assert.equal(await p.locator('#t1').evaluate(n => n.textContent), ' Left ');
+  assert.equal(await p.locator('#t2').textContent(), 'Right');
+  await p.waitForTimeout(550);
+  await rowsOf(p).nth(0).locator('button').click();
+  assert.equal(await p.locator('#s').evaluate(n => n.textContent), ' Hello ');
+  await p.getByRole('button', { name: 'Restore', exact: true }).click();
+  assert.equal(await p.locator('#s').evaluate(n => n.textContent), ' Hi ');
+  p.once('dialog', async d => { await d.accept(); });
+  await p.locator('#fixwords-reset-all').click();
+  assert.equal(await p.locator('#s').evaluate(n => n.textContent), ' Hello ');
+  await p.reload();
+  assert.equal(await p.locator('#s').evaluate(n => n.textContent), ' Hello ');
+  await done(p);
+});
+test('revert one with comments: rows list edits only, notes stay on row revert, Undo all deletes notes, notes-only list', async () => {
+  const p = await open('en');
+  await start(p);
+  await edit(p, '#dup1', 'One');
+  await commentToggle(p).click();
+  await p.locator('#dup2').click();
+  await p.locator('#fixwords-note-input').fill('Why?'); await p.keyboard.press('Control+Enter');
+  await commentToggle(p).click();
+  await openList(p);
+  assert.equal(await rowsOf(p).count(), 1);
+  await rowsOf(p).nth(0).locator('button').click();
+  assert.equal(await p.locator('#dup1').textContent(), 'Baked daily');
+  assert.equal((await stored(p)).notes.length, 1);
+  assert.equal(await p.locator('#fixwords-reset-all').isVisible(), true);
+  assert.ok((await p.locator('#fixwords-panel').textContent()).includes('No changes yet'));
+  p.once('dialog', async d => { await d.accept(); });
+  await p.locator('#fixwords-reset-all').click();
+  assert.equal((await stored(p)).notes, undefined);
+  assert.equal(await p.locator('#dup2').getAttribute('data-fixwords-noted'), null);
+  assert.equal(await p.locator('#fixwords-panel').isVisible(), false);
+  await done(p);
+});
+test('revert one: opening a comment or label closes the list, bar button hidden when nothing to undo', async () => {
+  const p = await open('en');
+  await start(p);
+  assert.equal(await resetBtn(p).isVisible(), false);
+  await edit(p, '#dup1', 'One');
+  await openList(p);
+  await p.locator('#label').click();
+  assert.equal(await p.locator('#fixwords-panel').isVisible(), false);
+  assert.equal(await p.locator('#fixwords-svg-input').count(), 1);
+  await p.keyboard.press('Escape');
   await done(p);
 });
 
