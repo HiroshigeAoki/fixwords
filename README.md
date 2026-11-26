@@ -2,13 +2,16 @@
 
 [日本語](README.ja.md)
 
-Let the people you shared a page with fix its wording themselves.
+A small tool that lets the people you shared an HTML page with fix its wording themselves.
 
 <p><img src="docs/images/edit-en.png" width="440" alt="A room booking mockup in edit mode. The lead sentence and a label in the figure were rewritten and are highlighted, and the fixwords bar at the bottom shows 2 changes."></p>
 
-You made a mockup or a draft page (perhaps with an AI coding agent) and sent it to colleagues who do not write
-code. They spot wording they would change. With fixwords on the page they rewrite the text right where they see
-it, press one button, and paste the result into a chat or an email to you:
+Example:
+
+You had an AI coding agent make a mockup or a document as an HTML page, and reading it you spot wording you
+would change. With fixwords on the page you rewrite the text right where you see it, press one button, and paste
+the result back to the agent. You can also send the page to colleagues who do not write code and have them send
+you the list in a chat or an email.
 
 ```
 Room booking (mockup) — Wording changes
@@ -20,7 +23,7 @@ Room booking (mockup) — Wording changes
    After: Awaiting approval
 ```
 
-You apply the list to the source yourself, or paste it to your agent.
+The agent applies the list to the source. You can also apply it yourself.
 
 - One script file, no dependencies, no build step, no server. Nothing is sent anywhere by the script.
 - Works on plain static HTML, including text labels inside inline SVG figures.
