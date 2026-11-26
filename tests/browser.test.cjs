@@ -794,18 +794,18 @@ test('marks: bar status and send button count verdicts, edits and comments', asy
     await verdicts(p, 'm1').nth(0).click();
     assert.equal(await p.locator('#fixwords-send').getAttribute('aria-disabled'), 'false');
     assert.equal(await p.locator('#fixwords-status').textContent(), ja ? '判定 1/3 ・ まだ送っていません' : 'Verdicts 1/3 · Not sent yet');
-    assert.equal(await p.locator('#fixwords-send').textContent(), ja ? '結果を送る（判定 1/3）' : 'Send results (verdicts 1/3)');
+    assert.equal(await p.locator('#fixwords-send').textContent(), ja ? '結果を送る（判定 1/3）' : 'Send results (Verdicts 1/3)');
     await start(p);
     await edit(p, '#m3 > span:first-child', 'Mail');
-    assert.equal(await p.locator('#fixwords-status').textContent(), ja ? '判定 1/3・直し 1 か所 ・ まだ送っていません' : 'Verdicts 1/3, changes 1 · Not sent yet');
-    assert.equal(await p.locator('#fixwords-send').textContent(), ja ? '結果を送る（判定 1/3・直し 1 か所）' : 'Send results (verdicts 1/3, 1 changes)');
+    assert.equal(await p.locator('#fixwords-status').textContent(), ja ? '判定 1/3・直し 1 か所 ・ まだ送っていません' : 'Verdicts 1/3, changes: 1 · Not sent yet');
+    assert.equal(await p.locator('#fixwords-send').textContent(), ja ? '結果を送る（判定 1/3・直し 1 か所）' : 'Send results (Verdicts 1/3, changes: 1)');
     await p.locator('#fixwords-comment').click();
     await p.locator('#m1 > span:first-child').click();
     await p.locator('#fixwords-note-input').fill('Why?'); await p.keyboard.press('Control+Enter');
-    assert.equal(await p.locator('#fixwords-send').textContent(), ja ? '結果を送る（判定 1/3・直し 1 か所・コメント 1 件）' : 'Send results (verdicts 1/3, 1 changes, 1 comments)');
+    assert.equal(await p.locator('#fixwords-send').textContent(), ja ? '結果を送る（判定 1/3・直し 1 か所・コメント 1 件）' : 'Send results (Verdicts 1/3, changes: 1, comments: 1)');
     await p.locator('#fixwords-send').click();
     await p.locator('#fixwords-panel').waitFor();
-    assert.equal(await p.locator('#fixwords-status').textContent(), ja ? '判定 1/3・直し 1 か所・コメント 1 件 ・ 送る文章はコピー済みです' : 'Verdicts 1/3, changes 1, comments 1 · Copied');
+    assert.equal(await p.locator('#fixwords-status').textContent(), ja ? '判定 1/3・直し 1 か所・コメント 1 件 ・ 送る文章はコピー済みです' : 'Verdicts 1/3, changes: 1, comments: 1 · Copied');
     await done(p);
   }
 });

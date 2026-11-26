@@ -102,6 +102,7 @@ To have the reader give each item one of a few verdicts instead of writing about
 
 - Each tagged item gets a row of buttons, shown all the time. Tapping a choice selects it; tapping it again clears it.
 - 1 to 6 choices, each up to 12 characters. Any other value turns verdicts off.
+- Put the attribute on an element that can hold a row of buttons, such as `li`, `div`, `p` or `td`, not on a `tr`.
 - An empty id becomes the item's position among the tagged items (1, 2, …). Items with the same id share one verdict.
 - Verdicts are kept in the browser with the edits and comments. They come first in the list, grouped by choice, with
   the items not yet marked last:

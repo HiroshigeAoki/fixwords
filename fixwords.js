@@ -76,9 +76,6 @@
     "rowLabel": "「{text}」を元に戻す{where}",
     "rowLabelEmpty": "空にした「{text}」を元に戻す{where}",
     "whereWrap": "（{where}）",
-    "partMarks": "判定 {k}/{all}",
-    "partEdits": "直し {n} か所",
-    "partNotes": "コメント {m} 件",
     "marksHead": "判定（{total}件中 {n}件）",
     "unmarked": "未判定",
     "statMarks": "判定 {k}/{all}",
@@ -166,16 +163,13 @@
     "marksHead": "Verdicts ({n} of {total})",
     "unmarked": "Unmarked",
     "statMarks": "Verdicts {k}/{all}",
-    "statEdits": "changes {n}",
-    "statNotes": "comments {m}",
+    "statEdits": "changes: {n}",
+    "statNotes": "comments: {m}",
     "statJoin": ", ",
     "tailPending": " · Not sent yet",
     "tailShared": " · Shared",
     "tailCopied": " · Copied",
-    "sendMarks": "Send results ({parts})",
-    "partMarks": "verdicts {k}/{all}",
-    "partEdits": "{n} changes",
-    "partNotes": "{m} comments"
+    "sendMarks": "Send results ({parts})"
   }
 };
   function boot() {
@@ -562,11 +556,12 @@
     send.textContent = m ? t("sendCountNotes", { n: e, m: m }) : t("sendCount", { n: n });
     if (choices.length) {
       var v = { k: k, all: markIds.length, n: e, m: m };
-      var parts = [t("partMarks", v)], stats = [t("statMarks", v)];
-      if (e) { parts.push(t("partEdits", v)); stats.push(t("statEdits", v)); }
-      if (m) { parts.push(t("partNotes", v)); stats.push(t("statNotes", v)); }
-      status.textContent = !all ? t("empty") : stats.join(t("statJoin")) + t(pending ? "tailPending" : sentMode === "shared" ? "tailShared" : "tailCopied");
-      send.textContent = t("sendMarks", { parts: parts.join(t("statJoin")) });
+      var stats = [t("statMarks", v)];
+      if (e) stats.push(t("statEdits", v));
+      if (m) stats.push(t("statNotes", v));
+      stats = stats.join(t("statJoin"));
+      status.textContent = !all ? t("empty") : stats + t(pending ? "tailPending" : sentMode === "shared" ? "tailShared" : "tailCopied");
+      send.textContent = t("sendMarks", { parts: stats });
     }
     status.setAttribute("data-state", !all ? "empty" : pending ? "unsent" : "sent");
     send.setAttribute("aria-disabled", !all ? "true" : "false");
