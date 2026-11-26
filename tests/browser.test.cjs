@@ -479,7 +479,7 @@ test('comments: SVG labels, page note, report, reset and counts in Japanese', as
   const p = await open('ja', { permissions: ['clipboard-read', 'clipboard-write'] });
   await start(p);
   await commentToggle(p).click();
-  assert.equal(await commentToggle(p).textContent(), '💬 コメント');
+  assert.equal(await commentToggle(p).textContent(), '✓ コメントを終える');
   assert.equal(await p.locator('#fixwords-pagenote').textContent(), 'ページ全体へのコメント');
   await p.locator('#label').click();
   assert.equal(await p.locator('#fixwords-svg-input').count(), 0);
@@ -562,6 +562,107 @@ test('comments: phone width, textarea stays in view, noted text survives an edit
   assert.equal(await p.locator('#dup1').getAttribute('data-fixwords-noted'), '');
   await done(p);
 });
+const pins = p => p.locator('.fixwords-note-pin');
+for (const lang of ['en', 'ja']) {
+  test('comments: a 💬 pin after the commented text opens its note outside comment mode (' + lang + ')', async () => {
+    const p = await open(lang);
+    await start(p);
+    assert.equal(await pins(p).count(), 0);
+    await commentToggle(p).click();
+    await note(p, '#dup1', 'Same on holidays?');
+    await note(p, '#label', 'Why a bag?');
+    assert.equal(await pins(p).count(), 2);
+    // Just after the last character of the text, on the same line.
+    const pin = pins(p).first();
+    const range = await p.locator('#dup1').evaluate(n => { const r = document.createRange(); r.selectNodeContents(n); const b = r.getBoundingClientRect(); return { right: b.right, top: b.top, bottom: b.bottom }; });
+    const box = await pin.boundingBox();
+    assert.ok(box.x >= range.right && box.x <= range.right + 12, 'pin x ' + box.x + ' vs text end ' + range.right);
+    assert.ok(box.y < range.bottom && box.y + box.height > range.top);
+    assert.equal(await pin.textContent(), '💬');
+    assert.equal(await pin.getAttribute('aria-label'), lang === 'en' ? 'Open comment: Baked daily' : 'コメントを開く：毎朝焼きます');
+    // SVG label: right of its box.
+    const label = await p.locator('#label').boundingBox();
+    const svgPin = await pins(p).nth(1).boundingBox();
+    assert.ok(svgPin.x >= label.x + label.width);
+    // Out of comment mode and out of editing, the pin still opens the note.
+    await commentToggle(p).click();
+    await p.getByRole('button', { name: lang === 'en' ? 'Finish editing' : '直すのを終える', exact: true }).click();
+    assert.equal(await p.locator('#dup1').getAttribute('contenteditable'), null);
+    await pin.click();
+    const input = p.locator('#fixwords-note-input');
+    assert.equal(await input.inputValue(), 'Same on holidays?');
+    await input.fill('Also on Sundays?'); await p.keyboard.press('Control+Enter');
+    assert.equal(await p.evaluate(() => document.activeElement.className), 'fixwords-note-pin');
+    assert.equal((await stored(p)).notes.find(n => n.c.startsWith('Also')).c, 'Also on Sundays?');
+    // Emptying the note removes its pin.
+    await pin.click(); await input.fill(' '); await p.keyboard.press('Control+Enter');
+    assert.equal(await pins(p).count(), 1);
+    // Tucked: still shown. Closed and print: gone.
+    await p.locator('#fixwords-hide').click();
+    assert.equal(await pins(p).first().isVisible(), true);
+    await p.emulateMedia({ media: 'print' });
+    assert.equal(await pins(p).first().isVisible(), false);
+    await p.emulateMedia({ media: 'screen' });
+    // A reload brings saved notes back with their pin.
+    await p.reload();
+    assert.equal(await pins(p).count(), 1);
+    await p.locator('#fixwords-close').click();
+    assert.equal(await pins(p).count(), 0);
+    await done(p);
+  });
+}
+test('comments: the pin follows an edit and a resize, and stays inside a phone viewport', async () => {
+  const p = await open('en', { hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+  await start(p);
+  await commentToggle(p).click();
+  await note(p, '#dup1', 'Hi');
+  await commentToggle(p).click();
+  const before = await pins(p).boundingBox();
+  await edit(p, '#dup1', 'Baked daily in the oven by the window next to the door of the shop');
+  const after = await pins(p).boundingBox();
+  assert.ok(after.y > before.y, 'pin moved to the last line');
+  assert.ok(after.x + after.width <= 390);
+  assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= 390), true);
+  await p.setViewportSize({ width: 800, height: 844 });
+  // The resize event arrives after setViewportSize returns.
+  await p.waitForFunction(() => {
+    const r = document.createRange(); r.selectNodeContents(document.getElementById('dup1'));
+    const rs = r.getClientRects(), pin = document.querySelector('.fixwords-note-pin').getBoundingClientRect();
+    return Math.abs(pin.left - rs[rs.length - 1].right) < 12;
+  }, null, { timeout: 2000 });
+  await done(p);
+});
+for (const lang of ['en', 'ja']) {
+  test('comments: comment mode shows a hint, a 「finish」 button, blue outlines, and Escape leaves it (' + lang + ')', async () => {
+    const p = await open(lang, { colorScheme: 'dark' });
+    const S = lang === 'en'
+      ? { hint: '💬 Tap the words you want to comment on', done: '✓ Finish commenting', comment: '💬 Comment' }
+      : { hint: '💬 コメントしたい文字をタップしてください', done: '✓ コメントを終える', comment: '💬 コメント' };
+    await start(p);
+    const hint = p.locator('#fixwords-mode');
+    assert.equal(await hint.isVisible(), false);
+    await commentToggle(p).click();
+    assert.equal(await hint.textContent(), S.hint);
+    assert.equal(await hint.isVisible(), true);
+    assert.equal(await p.locator('#fixwords-guide').isVisible(), false);
+    assert.equal(await commentToggle(p).textContent(), S.done);
+    assert.equal(await commentToggle(p).evaluate(n => getComputedStyle(n).backgroundColor), 'rgb(37, 99, 235)');
+    assert.equal(await p.locator('#dup1').evaluate(n => getComputedStyle(n).outlineColor), 'rgb(37, 99, 235)');
+    // Escape inside the note field cancels the note only.
+    await p.locator('#dup1').click();
+    await p.keyboard.press('Escape');
+    assert.equal(await p.locator('#fixwords-note-input').count(), 0);
+    assert.equal(await commentToggle(p).getAttribute('aria-pressed'), 'true');
+    // A second Escape leaves comment mode.
+    await p.keyboard.press('Escape');
+    assert.equal(await commentToggle(p).getAttribute('aria-pressed'), 'false');
+    assert.equal(await commentToggle(p).textContent(), S.comment);
+    assert.equal(await hint.isVisible(), false);
+    assert.equal(await p.locator('#dup1').getAttribute('contenteditable'), 'plaintext-only');
+    assert.equal(await p.evaluate(() => document.activeElement.id), 'fixwords-comment');
+    await done(p);
+  });
+}
 
 
 // Revert one edit from a list.
