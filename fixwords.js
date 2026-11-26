@@ -271,34 +271,28 @@
   function cleanNote(value) {
     return typeof value === "string" ? value.replace(/\r\n?/g, "\n").replace(/ *\n */g, "\n").replace(/\n{2,}/g, "\n").trim() : "";
   }
+  // Saved entries are trusted only when the version matches; each one is tied to its element by text, index and count.
+  function savedList(name) { return saved && saved.v === 1 && Array.isArray(saved[name]) ? saved[name] : []; }
+  function savedFor(name, it, valid) {
+    var found = null;
+    savedList(name).some(function (e) {
+      if (e && e.o === it.original && !!e.s === it.svg && e.i === it.index && e.n === it.total && valid(e)) { found = e; return true; }
+      return false;
+    });
+    return found;
+  }
   items.forEach(function (it) {
     it.total = totals[it.svg ? 1 : 0][it.original];
-    it.note = "";
-    if (saved && saved.v === 1 && Array.isArray(saved.notes)) {
-      saved.notes.some(function (n) {
-        if (n && n.o === it.original && !!n.s === it.svg && n.i === it.index && n.n === it.total && cleanNote(n.c)) {
-          it.note = cleanNote(n.c);
-          return true;
-        }
-        return false;
-      });
-    }
-    if (!saved || saved.v !== 1 || !Array.isArray(saved.edits)) return;
-    saved.edits.some(function (edit) {
-      if (edit && edit.o === it.original && !!edit.s === it.svg && edit.i === it.index && edit.n === it.total && typeof edit.t === "string") {
-        writeBack(it, edit.t);
-        return true;
-      }
-      return false;
-    });
+    var n = savedFor("notes", it, function (e) { return cleanNote(e.c); });
+    it.note = n ? cleanNote(n.c) : "";
+    var edit = savedFor("edits", it, function (e) { return typeof e.t === "string"; });
+    if (edit) writeBack(it, edit.t);
   });
 
-  if (saved && saved.v === 1 && Array.isArray(saved.notes)) {
-    saved.notes.some(function (n) {
-      if (n && typeof n === "object" && n.o === undefined && cleanNote(n.c)) { pageNote = cleanNote(n.c); return true; }
-      return false;
-    });
-  }
+  savedList("notes").some(function (n) {
+    if (n && typeof n === "object" && n.o === undefined && cleanNote(n.c)) { pageNote = cleanNote(n.c); return true; }
+    return false;
+  });
   function noted() { return items.filter(function (it) { return it.note; }); }
   function noteCount() { return noted().length + (pageNote ? 1 : 0); }
   function total() { return changes().length + noteCount(); }
@@ -323,8 +317,8 @@
     try { localStorage.setItem(KEY, JSON.stringify(map)); } catch (e) { /* private mode: edits last until reload */ }
     render();
   }
+  function oneLine(s) { return s.replace(/\n/g, t("lineSeparator")); }
   function report() {
-    var one = function (s) { return s.replace(/\n/g, t("lineSeparator")); };
     var lines = [t("reportTitle", { title: title })];
     if (genre) lines.push(t("genre", { genre: genre }));
     var head = lines.length;
@@ -335,13 +329,13 @@
     var number = 0;
     changes().forEach(function (it) {
       var label = (it.svg ? t("figure") : "") + t("before") + hint(it);
-      lines.push("", ++number + ". " + label + t("separator") + one(it.original), t("after", { text: one(text(it.node)) }));
+      lines.push("", ++number + ". " + label + t("separator") + oneLine(it.original), t("after", { text: oneLine(text(it.node)) }));
     });
     noted().forEach(function (it) {
-      lines.push("", ++number + ". " + (it.svg ? t("figure") : "") + t("commentOn", { text: one(text(it.node)) }) + hint(it),
-        t("noteLine", { text: one(it.note) }));
+      lines.push("", ++number + ". " + (it.svg ? t("figure") : "") + t("commentOn", { text: oneLine(text(it.node)) }) + hint(it),
+        t("noteLine", { text: oneLine(it.note) }));
     });
-    if (pageNote) lines.push("", ++number + ". " + t("commentPage"), t("noteLine", { text: one(pageNote) }));
+    if (pageNote) lines.push("", ++number + ". " + t("commentPage"), t("noteLine", { text: oneLine(pageNote) }));
     if (lines.length === head) lines.push("", t("noChanges"));
     return lines.join("\n");
   }
@@ -652,13 +646,13 @@
       var loc = locationLabel(it);
       if (loc) element("div", "", row, loc).className = "fixwords-location";
       element("span", "", row, t("was")).className = "fixwords-sr";
-      element("del", "", row, it.original.replace(/\n/g, t("lineSeparator"))).className = "fixwords-text";
-      var current = text(it.node).replace(/\n/g, t("lineSeparator"));
+      element("del", "", row, oneLine(it.original)).className = "fixwords-text";
+      var current = oneLine(text(it.node));
       element("span", "", row, t("now")).className = "fixwords-sr";
       element("div", "", row, current || t("emptied")).className = "fixwords-text";
       var revert = button(t("rowUndo"), row);
       revert.setAttribute("aria-label", t(current ? "rowLabel" : "rowLabelEmpty", {
-        text: cut(current || it.original.replace(/\n/g, t("lineSeparator")), 20), where: loc ? t("whereWrap", { where: loc }) : "" }));
+        text: cut(current || oneLine(it.original), 20), where: loc ? t("whereWrap", { where: loc }) : "" }));
       revert.addEventListener("click", function () {
         // The next row moves under the pointer: a double click must not revert it too.
         if (Date.now() - revertedAt < 500) return;
