@@ -492,7 +492,7 @@
   var start = button(t("startIdle"), header, "title");
   // Hide tucks the bar into the pen button and keeps editing on; the cross also ends editing.
   var hide = button(t("hide"), header, "hide");
-  var close = button(t("iconClose"), header); close.setAttribute("aria-label", t("close"));
+  var close = button(t("iconClose"), header, "close"); close.setAttribute("aria-label", t("close"));
   var content = element("div", "content", bar);
   var guide = element("div", "guide", content);
   element("div", "", guide, t("stepOne"));
@@ -533,7 +533,7 @@
   var rows = element("div", "", listView);
   var resetAll = button(t("resetAll"), listView, "reset-all");
   var undoSlot = null, revertedAt = 0;
-  var spacer = element("div", "spacer"); spacer.setAttribute("aria-hidden", "true");
+  var spacer = element("div", "spacer"), room = 0; spacer.setAttribute("aria-hidden", "true");
   function reveal(node) {
     if (!node.hidden && node.hasAttribute("data-visible")) return;
     node.hidden = false; node.removeAttribute("data-visible");
@@ -542,10 +542,11 @@
   function layout() {
     var phone = window.matchMedia("(max-width:600px)").matches;
     var open = !closed && (editing || total() > 0);
+    // A tucked bar keeps its last room, so the text being edited does not jump.
+    if (!bar.hidden && panel.hidden) room = bar.offsetHeight;
     if (phone && open && panel.hidden) {
       if (!spacer.parentNode) document.body.appendChild(spacer);
-      // A tucked bar keeps its room, so the text being edited does not jump.
-      if (!tucked) spacer.style.height = bar.offsetHeight + "px";
+      spacer.style.height = room + "px";
     } else if (spacer.parentNode) spacer.parentNode.removeChild(spacer);
     panel.style.maxHeight = Math.max(80, window.innerHeight - 28) + "px";
     // A button that takes focus is scrolled clear of the pinned list top, not under it.
@@ -813,7 +814,7 @@
     setUndo(null);
     bar.removeAttribute("data-sheet"); panel.hidden = true; panel.removeAttribute("data-visible");
     document.body.classList.remove("fixwords-show-changes"); render();
-    if (wasOpen && restoreFocus === true) (wasList ? (!reset.hidden && !closed ? reset : start) : send).focus();
+    if (wasOpen && restoreFocus === true) (bar.hidden ? handle : wasList ? (!reset.hidden ? reset : start) : send).focus();
   }
   function openPanel(view, label) {
     setUndo(null);
@@ -828,7 +829,7 @@
     if (changed.length) changed[0].node.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
   }
   // A share or copy can settle after the user edited again or folded the bar; its sheet must not open then.
-  function stale(value) { return closed || report() !== value; }
+  function stale(value) { return closed || tucked || report() !== value; }
   function result(value, mode) {
     busy = false;
     // Record the hand-off even when stale: the hash only matches if the text comes back to this exact report.
@@ -908,7 +909,7 @@
     if (e.key === "Escape" && !panel.hidden) { e.preventDefault(); hideSheet(true); }
   });
   function setClosed(on) {
-    closed = on;
+    closed = on; tucked = false;
     if (on) { setEditing(false); hideSheet(); }
     persist();
   }

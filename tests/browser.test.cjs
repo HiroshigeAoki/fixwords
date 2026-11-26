@@ -71,7 +71,7 @@ test('hide tucks the bar into the pen button while editing stays on, and the pen
     assert.match(await p.locator('#fixwords-status').textContent(), /2/);
     assert.equal(await p.locator('#dup2').getAttribute('contenteditable'), 'plaintext-only');
     // The cross keeps its meaning: it closes the bar and ends editing.
-    await p.locator('#fixwords-bar button[aria-label]').click();
+    await p.locator('#fixwords-close').click();
     assert.equal(await p.locator('#dup2').getAttribute('contenteditable'), null);
     await p.locator('#fixwords-handle').click();
     assert.equal(await p.locator('#fixwords-bar').isVisible(), true);
@@ -89,6 +89,15 @@ test('hide on a phone keeps the room under the text, so the page does not jump',
   await p.locator('#fixwords-hide').click();
   assert.equal(await p.evaluate(() => window.scrollY), y);
   await done(p);
+  // Hiding on a wide window and then turning it into a phone still leaves room.
+  const q = await open('en', { viewport: { width: 700, height: 390 } });
+  await start(q);
+  await edit(q);
+  await q.locator('#fixwords-hide').click();
+  await q.setViewportSize({ width: 390, height: 500 });
+  await q.waitForFunction(() => document.getElementById('fixwords-spacer'));
+  assert.ok(await q.evaluate(() => document.getElementById('fixwords-spacer').offsetHeight) > 100);
+  await done(q);
 });
 test('language selection: page, configuration and navigator', async () => {
   for (const [html, configured, locale, expected] of [
