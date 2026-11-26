@@ -111,6 +111,18 @@ class LearnTest(unittest.TestCase):
         self.assertNotIn('x' * 201, digest)
         self.assertIn('…', digest)
 
+    def test_review2_round_dash_commands_and_empty_sections(self):
+        accept, reject = fw.pair_commands(('-foo', 'bar'))
+        self.assertEqual(accept, "python3 fixwords.py accept -- -foo bar")
+        self.assertEqual(reject, "python3 fixwords.py reject -- -foo bar")
+        self.assertEqual(self.cli('accept', '--', '-foo', 'bar').stderr.count('unrecognized'), 0)
+        fw.write_rows('log.jsonl', [dict(ts='2026-01-01', doc='Garden', genre='guide',
+                      kind='comment', note='Too long', target='Intro', question=False)])
+        self.assertEqual(self.cli('learn').returncode, 0)
+        digest = (self.home / 'digest.md').read_text()
+        self.assertNotIn('```text\n```', digest)
+        self.assertIn('```text\n(none)\n```', digest)
+
     def test_t3_learning_and_stats(self):
         def log(doc, before='utilize', after='use', genre='guide'):
             result = self.cli('log', text=f'{doc} — Wording changes\nType: {genre}\n\n1. Before: {before}\n   After: {after}')

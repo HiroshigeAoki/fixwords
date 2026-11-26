@@ -436,7 +436,10 @@ def promoted_pairs(rows, decisions):
 
 
 def pair_commands(pair):
+    # "--" keeps a word that starts with "-" from being read as an option.
     argument = ' '.join(shlex.quote(part) for part in pair)
+    if any(part.startswith('-') for part in pair):
+        argument = '-- ' + argument
     return f'python3 fixwords.py accept {argument}', f'python3 fixwords.py reject {argument}'
 
 
@@ -499,6 +502,8 @@ def learn():
             for key in sorted(grouped, key=lambda key: (-grouped[key][0], -datetime.fromisoformat(grouped[key][1]).timestamp(), key))[:40]:
                 count, recent = grouped[key]
                 digest.append(f'- {count} evidence items; latest {recent[:10]}: {key}')
+            if not grouped:
+                digest.append('(none)')
             digest.extend(['```', ''])
         digest.extend(['### Unpromoted pairs', '', '```text'])
         local = aggregate(selected)
@@ -506,6 +511,8 @@ def learn():
         for pair in sorted(repeated, key=lambda pair: (-local[pair]['count'], pair))[:40]:
             info = local[pair]
             digest.append(f"- {evidence_quote(pair[0])} → {evidence_quote(pair[1])}: {info['count']} times in {len(info['docs'])} documents; context {evidence_quote(info['ctx'])}")
+        if not repeated:
+            digest.append('(none)')
         digest.extend(['```', ''])
     write_data('digest.md', '\n'.join(digest) + '\n')
     print(f'{len(promoted)} promoted, {len(unpromoted)} candidates, {len(genres)} genres')
