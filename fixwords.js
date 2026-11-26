@@ -46,7 +46,18 @@
     "lineSeparator": " ／ ",
     "destinationEnd": "。",
     "iconClose": "×",
-    "iconEdit": "✎"
+    "iconEdit": "✎",
+    "comment": "💬 コメント",
+    "pageComment": "ページ全体へのコメント",
+    "noteLabel": "コメントを書く",
+    "pendingNotes": "直し {n} か所・コメント {m} 件 ・ まだ送っていません",
+    "sharedStatusNotes": "直し {n} か所・コメント {m} 件 ・ 共有済みです",
+    "copiedStatusNotes": "直し {n} か所・コメント {m} 件 ・ 送る文章はコピー済みです",
+    "sendCountNotes": "直した内容を送る（直し {n} か所・コメント {m} 件）",
+    "commentOn": "コメント（対象：{text}）",
+    "commentPage": "コメント（ページ全体）",
+    "noteLine": "   内容：{text}",
+    "genre": "種類：{genre}"
   },
   "en": {
     "startIdle": "✎ Fix wording",
@@ -91,7 +102,18 @@
     "lineSeparator": " / ",
     "destinationEnd": ".",
     "iconClose": "×",
-    "iconEdit": "✎"
+    "iconEdit": "✎",
+    "comment": "💬 Comment",
+    "pageComment": "Comment on the whole page",
+    "noteLabel": "Write a comment",
+    "pendingNotes": "Changes: {n}, comments: {m} · Not sent yet",
+    "sharedStatusNotes": "Changes: {n}, comments: {m} · Shared",
+    "copiedStatusNotes": "Changes: {n}, comments: {m} · Copied",
+    "sendCountNotes": "Send your changes ({n} + {m} comments)",
+    "commentOn": "Comment on: {text}",
+    "commentPage": "Comment (whole page)",
+    "noteLine": "   Note: {text}",
+    "genre": "Type: {genre}"
   }
 };
   function boot() {
@@ -113,7 +135,7 @@
     });
   }
   var KEY = "fixwords:" + location.pathname;
-  var SKIP = "script, style, noscript, textarea, select, #fixwords-bar, #fixwords-panel, #fixwords-handle, #fixwords-svg-input, [data-no-edit]";
+  var SKIP = "script, style, noscript, textarea, select, #fixwords-bar, #fixwords-panel, #fixwords-handle, #fixwords-svg-input, #fixwords-note-input, #fixwords-pagenote, [data-no-edit]";
   if (typeof config.skip === "string" && config.skip.trim()) {
     try {
       document.querySelector(config.skip);
@@ -121,6 +143,7 @@
     } catch (e) { /* Ignore invalid selectors. */ }
   }
   var title = typeof config.title === "string" ? config.title : document.title || location.pathname;
+  var genre = typeof config.genre === "string" ? config.genre.replace(/\s+/g, " ").trim().slice(0, 40) : "";
   var saved = null;
   try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { /* Storage is optional. */ }
   // Closed: the bar is folded into a small handle so it does not cover the page.
@@ -199,8 +222,23 @@
     if (hint.length > 30) hint = hint.slice(0, 30) + "…";
     items.push({ node: node, original: original, index: counts[original], heading: hint, svg: svg, raw: svg ? node.textContent : "" });
   });
+  // A note is a plain string per element (it.note) plus one page-level note.
+  var pageNote = "";
+  function cleanNote(value) {
+    return typeof value === "string" ? value.replace(/\r\n?/g, "\n").replace(/ *\n */g, "\n").replace(/\n{2,}/g, "\n").trim() : "";
+  }
   items.forEach(function (it) {
     it.total = totals[it.svg ? 1 : 0][it.original];
+    it.note = "";
+    if (saved && saved.v === 1 && Array.isArray(saved.notes)) {
+      saved.notes.some(function (n) {
+        if (n && n.o === it.original && !!n.s === it.svg && n.i === it.index && n.n === it.total && cleanNote(n.c)) {
+          it.note = cleanNote(n.c);
+          return true;
+        }
+        return false;
+      });
+    }
     if (!saved || saved.v !== 1 || !Array.isArray(saved.edits)) return;
     saved.edits.some(function (edit) {
       if (edit && edit.o === it.original && !!edit.s === it.svg && edit.i === it.index && edit.n === it.total && typeof edit.t === "string") {
@@ -214,6 +252,15 @@
     });
   });
 
+  if (saved && saved.v === 1 && Array.isArray(saved.notes)) {
+    saved.notes.some(function (n) {
+      if (n && typeof n === "object" && n.o === undefined && cleanNote(n.c)) { pageNote = cleanNote(n.c); return true; }
+      return false;
+    });
+  }
+  function noted() { return items.filter(function (it) { return it.note; }); }
+  function noteCount() { return noted().length + (pageNote ? 1 : 0); }
+  function total() { return changes().length + noteCount(); }
   function changes() {
     return items.filter(function (it) { return text(it.node) !== it.original; });
   }
@@ -224,6 +271,13 @@
       if (it.svg) edit.s = 1;
       return edit;
     }) };
+    var notes = noted().map(function (it) {
+      var n = { o: it.original, i: it.index, n: it.total, c: it.note };
+      if (it.svg) n.s = 1;
+      return n;
+    });
+    if (pageNote) notes.push({ c: pageNote });
+    if (notes.length) map.notes = notes;
     if (sent) map.sent = sent;
     try { localStorage.setItem(KEY, JSON.stringify(map)); } catch (e) { /* private mode: edits last until reload */ }
     render();
@@ -231,15 +285,23 @@
   function report() {
     var one = function (s) { return s.replace(/\n/g, t("lineSeparator")); };
     var lines = [t("reportTitle", { title: title })];
-    changes().forEach(function (it, i) {
-      var label = (it.svg ? t("figure") : "") + t("before");
-      if (it.total > 1) {
-        label += t("occurrence", { index: it.index, total: it.total,
-          heading: it.heading ? t("heading", { heading: it.heading }) : "" });
-      }
-      lines.push("", (i + 1) + ". " + label + t("separator") + one(it.original), t("after", { text: one(text(it.node)) }));
+    if (genre) lines.push(t("genre", { genre: genre }));
+    var head = lines.length;
+    function hint(it) {
+      return it.total > 1 ? t("occurrence", { index: it.index, total: it.total,
+        heading: it.heading ? t("heading", { heading: it.heading }) : "" }) : "";
+    }
+    var number = 0;
+    changes().forEach(function (it) {
+      var label = (it.svg ? t("figure") : "") + t("before") + hint(it);
+      lines.push("", ++number + ". " + label + t("separator") + one(it.original), t("after", { text: one(text(it.node)) }));
     });
-    if (lines.length === 1) lines.push("", t("noChanges"));
+    noted().forEach(function (it) {
+      lines.push("", ++number + ". " + (it.svg ? t("figure") : "") + t("commentOn", { text: one(text(it.node)) }) + hint(it),
+        t("noteLine", { text: one(it.note) }));
+    });
+    if (pageNote) lines.push("", ++number + ". " + t("commentPage"), t("noteLine", { text: one(pageNote) }));
+    if (lines.length === head) lines.push("", t("noChanges"));
     return lines.join("\n");
   }
 
@@ -247,16 +309,16 @@
   var destination = typeof config.send_to === "string" ? config.send_to.replace(/\s+/g, " ").trim() : "";
   if (destination.length > 60) destination = destination.slice(0, 60) + "…";
   if (destination && !/[。.!?！？]$/.test(destination)) destination += t("destinationEnd");
-  var editing = false, busy = false, sheetText = "", sentMode = "copied";
+  var editing = false, commenting = false, busy = false, sheetText = "", sentMode = "copied";
   function hash(value) {
     var h = 5381;
     for (var i = 0; i < value.length; i++) h = ((h << 5) + h) ^ value.charCodeAt(i);
     return (h >>> 0).toString(36);
   }
-  function unsent() { return changes().length > 0 && hash(report()) !== sent; }
+  function unsent() { return total() > 0 && hash(report()) !== sent; }
   var css = document.createElement("style");
   css.textContent =
-    "#fixwords-svg-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#fff;--ink:#191d22;--edge:rgba(25,29,34,.24);--accent:#0b6e66;--accent-ink:#fff;--amber:#b45309;--muted:#535b65;box-sizing:border-box;position:fixed;right:14px;bottom:14px;z-index:2147483000;background:var(--surface);color:var(--ink);border:1px solid var(--edge);box-shadow:0 4px 24px rgba(0,0,0,.28);font:500 15px/1.5 'Hiragino Sans','Yu Gothic','Noto Sans CJK JP',sans-serif}" +
+    "#fixwords-svg-input,#fixwords-note-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#fff;--ink:#191d22;--edge:rgba(25,29,34,.24);--accent:#0b6e66;--accent-ink:#fff;--amber:#b45309;--muted:#535b65;box-sizing:border-box;position:fixed;right:14px;bottom:14px;z-index:2147483000;background:var(--surface);color:var(--ink);border:1px solid var(--edge);box-shadow:0 4px 24px rgba(0,0,0,.28);font:500 15px/1.5 'Hiragino Sans','Yu Gothic','Noto Sans CJK JP',sans-serif}" +
     "#fixwords-bar,#fixwords-panel{width:min(440px,calc(100vw - 28px));padding:12px;border-radius:16px;opacity:0;transform:translateY(8px);transition:opacity 200ms cubic-bezier(.23,1,.32,1),transform 200ms cubic-bezier(.23,1,.32,1)}" +
     "#fixwords-bar[data-visible],#fixwords-panel[data-visible]{opacity:1;transform:translateY(0)}" +
     "#fixwords-bar button,#fixwords-panel button,#fixwords-handle{box-sizing:border-box;min-width:44px;min-height:44px;font:inherit;border:0;border-radius:10px;background:transparent;color:inherit;padding:8px 12px;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:transform 120ms cubic-bezier(.23,1,.32,1)}" +
@@ -272,12 +334,14 @@
     "#fixwords-panel{overflow-y:auto;overscroll-behavior:contain}#fixwords-note{white-space:pre-line;overflow-wrap:anywhere}#fixwords-note[data-mode=copied]:first-line{font-size:20px;font-weight:600}" +
     "#fixwords-panel textarea{box-sizing:border-box;display:block;width:100%;font:400 16px/1.5 'Hiragino Sans','Yu Gothic','Noto Sans CJK JP',sans-serif;margin:12px 0;padding:8px;border:1px solid var(--edge);border-radius:8px;background:var(--surface);color:var(--ink);resize:vertical;overflow:auto}" +
     "body.fixwords-editing [data-fixwords-editable]{outline:1px dashed #e0a200;outline-offset:3px}body.fixwords-editing [data-fixwords-editable]:focus{outline:2px solid #e0a200;background:rgba(224,162,0,.14)}body.fixwords-editing [data-fixwords-changed]{box-shadow:inset 0 -3px 0 #e0a200}body.fixwords-show-changes [data-fixwords-changed]{background:rgba(255,214,10,.55);outline:2px solid #e0a200;outline-offset:2px;color:#000}" +
-    "@media(prefers-color-scheme:dark){#fixwords-svg-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#1f2329;--ink:#f2f4f6;--edge:rgba(242,244,246,.3);--accent:#35b3a7;--accent-ink:#191d22;--amber:#fbbf24;--muted:#bdc4cd}}" +
+    "@media(prefers-color-scheme:dark){#fixwords-svg-input,#fixwords-note-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#1f2329;--ink:#f2f4f6;--edge:rgba(242,244,246,.3);--accent:#35b3a7;--accent-ink:#191d22;--amber:#fbbf24;--muted:#bdc4cd}}" +
     "@media(hover:hover) and (pointer:fine){#fixwords-bar button:hover,#fixwords-panel button:hover,#fixwords-handle:hover{box-shadow:inset 0 0 0 2px var(--accent)}body.fixwords-editing [data-fixwords-editable]{cursor:text}}" +
     "@media(max-width:600px){#fixwords-bar:not([data-idle]),#fixwords-panel{right:0;bottom:0;width:100%;border-radius:16px 16px 0 0;padding-bottom:max(12px,env(safe-area-inset-bottom,0px));padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}}" +
     ".fixwords-box{fill:none;stroke:#e0a200;stroke-dasharray:3 2;vector-effect:non-scaling-stroke;pointer-events:none}.fixwords-box.changed{fill:rgba(224,162,0,.16);stroke-dasharray:none}" +
     "#fixwords-svg-input{position:absolute;right:auto;bottom:auto;z-index:2147482999;font-size:16px;min-height:44px;padding:8px;border:2px solid #e0a200;border-radius:8px;margin:0}" +
-    "@media print{.fixwords-box,#fixwords-svg-input{display:none!important}}" +
+    "#fixwords-note-input{display:block;position:absolute;right:auto;bottom:auto;z-index:2147482999;font-size:16px;font-weight:400;min-height:44px;padding:8px;border:2px solid #2563eb;border-radius:8px;margin:0;resize:none;overflow:auto}" +
+    "[data-fixwords-noted]{text-decoration:underline dotted #2563eb 2px;text-underline-offset:4px}.fixwords-box.noted{stroke:#2563eb;stroke-dasharray:1 3;stroke-linecap:round}#fixwords-bar #fixwords-pagenote[data-noted]{box-shadow:inset 0 -3px 0 #2563eb}#fixwords-bar #fixwords-comment[aria-pressed=true]{box-shadow:inset 0 0 0 2px #2563eb}" +
+    "@media print{.fixwords-box,#fixwords-svg-input,#fixwords-note-input{display:none!important}}" +
     "@media(prefers-reduced-motion:reduce){#fixwords-bar,#fixwords-panel,#fixwords-bar button,#fixwords-panel button,#fixwords-handle,#fixwords-status{transition:none}}";
   document.head.appendChild(css);
   function element(tag, id, parent, label) {
@@ -299,6 +363,8 @@
   var secondary = element("div", "secondary", content);
   var toggle = button(t("continue"), secondary);
   var reset = button(t("reset"), secondary);
+  var commentBtn = button(t("comment"), secondary, "comment");
+  var pageBtn = button(t("pageComment"), secondary, "pagenote"); pageBtn.hidden = true;
   var handle = button(t("iconEdit"), document.body, "handle");
   var badge = element("span", "badge", handle); badge.setAttribute("aria-hidden", "true");
   var panel = element("div", "panel", document.body); panel.hidden = true;
@@ -318,7 +384,7 @@
   }
   function layout() {
     var phone = window.matchMedia("(max-width:600px)").matches;
-    var open = !closed && (editing || changes().length > 0);
+    var open = !closed && (editing || total() > 0);
     if (phone && open && panel.hidden) {
       if (!spacer.parentNode) document.body.appendChild(spacer);
       spacer.style.height = bar.offsetHeight + "px";
@@ -326,16 +392,19 @@
     panel.style.maxHeight = Math.max(80, window.innerHeight - 28) + "px";
   }
   function render() {
-    var n = changes().length, pending = n && unsent(), idle = !editing && !n;
+    var e = changes().length, m = noteCount(), n = e + m, pending = n && unsent(), idle = !editing && !n;
     bar.hidden = closed; handle.hidden = !closed;
     if (idle) bar.setAttribute("data-idle", ""); else bar.removeAttribute("data-idle");
     start.textContent = idle ? t("startIdle") : t("start");
     content.hidden = idle; guide.hidden = !editing || n > 0; reset.hidden = !n;
+    commentBtn.hidden = idle; commentBtn.setAttribute("aria-pressed", commenting ? "true" : "false");
+    pageBtn.hidden = !commenting; if (pageNote) pageBtn.setAttribute("data-noted", ""); else pageBtn.removeAttribute("data-noted");
     toggle.textContent = editing ? t("stop") : t("continue");
     toggle.setAttribute("aria-pressed", editing ? "true" : "false");
-    status.textContent = !n ? t("empty") : pending ? t("pending", { n: n }) : t(sentMode === "shared" ? "sharedStatus" : "copiedStatus", { n: n });
+    var sentKey = (sentMode === "shared" ? "sharedStatus" : "copiedStatus") + (m ? "Notes" : "");
+    status.textContent = !n ? t("empty") : pending ? t(m ? "pendingNotes" : "pending", { n: e, m: m }) : t(sentKey, { n: e, m: m });
     status.setAttribute("data-state", !n ? "empty" : pending ? "unsent" : "sent");
-    send.textContent = t("sendCount", { n: n });
+    send.textContent = m ? t("sendCountNotes", { n: e, m: m }) : t("sendCount", { n: n });
     send.setAttribute("aria-disabled", !n ? "true" : "false");
     badge.hidden = !pending; badge.textContent = n;
     handle.setAttribute("aria-label", t("open") + (pending ? t("unsent", { n: n }) : ""));
@@ -344,9 +413,9 @@
   }
   // The box exists while editing, or while the label is changed; it is rebuilt on every call
   // because its size follows the label's current text and layout.
-  function markSvg(it, changed) {
+  function markSvg(it, changed, noted) {
     if (it.box) { it.box.remove(); it.box = null; }
-    if (!editing && !changed) return;
+    if (!editing && !changed && !noted) return;
     try {
       var b = it.node.getBBox();
       var anchor = it.node.localName === "text" ? it.node : it.node.closest("text");
@@ -354,7 +423,7 @@
       if (![b.x, b.y, b.width, b.height].every(isFinite) || (!b.width && !b.height) ||
           (!anchor.hasAttribute("transform") && getComputedStyle(anchor).transform !== "none")) return;
       var box = document.createElementNS(SVG, "rect");
-      box.setAttribute("class", "fixwords-box" + (changed ? " changed" : ""));
+      box.setAttribute("class", "fixwords-box" + (changed ? " changed" : "") + (noted ? " noted" : ""));
       box.setAttribute("x", b.x - 4); box.setAttribute("y", b.y - 2);
       box.setAttribute("width", Math.max(24, b.width + 8)); box.setAttribute("height", Math.max(12, b.height + 4));
       box.setAttribute("rx", "3");
@@ -365,7 +434,9 @@
   function mark() {
     items.forEach(function (it) {
       var changed = text(it.node) !== it.original;
-      if (it.svg) markSvg(it, changed);
+      if (it.svg) markSvg(it, changed, !!it.note);
+      if (it.note) it.node.setAttribute("data-fixwords-noted", "");
+      else it.node.removeAttribute("data-fixwords-noted");
       if (changed) it.node.setAttribute("data-fixwords-changed", "");
       else it.node.removeAttribute("data-fixwords-changed");
     });
@@ -373,18 +444,27 @@
   var svgInput = null, svgItem = null;
   // Safari ends the composition before the Enter that confirmed it; that keydown carries keyCode 229.
   function composing(e) { return e.isComposing || e.keyCode === 229; }
+  // Position a floating field next to a node: centred on it ("center"), or just below it, above if that does not fit ("below").
+  function place(box, node, width, where) {
+    var r = node.getBoundingClientRect();
+    var viewport = document.documentElement.clientWidth;
+    width = Math.max(0, Math.min(width, viewport - 16));
+    box.style.width = width + "px";
+    // Measure where left/top 0 puts the field: its containing block depends on the page's own layout.
+    box.style.left = box.style.top = "0px";
+    var zero = box.getBoundingClientRect();
+    var left = Math.max(8, Math.min(r.left + (r.width - width) / 2, viewport - width - 8));
+    var top = r.top + (r.height - zero.height) / 2;
+    if (where === "below") {
+      top = r.bottom + 6;
+      if (top + zero.height > window.innerHeight - 8) top = Math.max(8, r.top - zero.height - 6);
+    }
+    box.style.left = left - zero.left + "px";
+    box.style.top = top - zero.top + "px";
+  }
   function placeSvg() {
     if (!svgInput) return;
-    var r = svgItem.node.getBoundingClientRect();
-    var viewport = document.documentElement.clientWidth;
-    var width = Math.max(0, Math.min(Math.max(svgInput.value.length * 16.5 + 44, r.width + 44, 220), viewport - 16));
-    svgInput.style.width = width + "px";
-    // Measure where left/top 0 puts the input: its containing block depends on the page's own layout.
-    svgInput.style.left = svgInput.style.top = "0px";
-    var zero = svgInput.getBoundingClientRect();
-    var left = Math.max(8, Math.min(r.left + (r.width - width) / 2, viewport - width - 8));
-    svgInput.style.left = left - zero.left + "px";
-    svgInput.style.top = r.top + (r.height - zero.height) / 2 - zero.top + "px";
+    place(svgInput, svgItem.node, Math.max(svgInput.value.length * 16.5 + 44, svgItem.node.getBoundingClientRect().width + 44, 220), "center");
   }
   function finishSvg(cancel, focus) {
     if (!svgInput) return;
@@ -409,15 +489,60 @@
     });
     placeSvg(); svgInput.focus(); svgInput.select();
   }
+  // The comment field: one textarea for an element (target.item) or for the whole page (target.page).
+  var noteInput = null, noteTarget = null;
+  function placeNote() {
+    if (!noteInput) return;
+    var node = noteTarget.page ? pageBtn : noteTarget.item.node;
+    place(noteInput, node, Math.max(280, node.getBoundingClientRect().width), "below");
+  }
+  function finishNote(cancel, focus) {
+    if (!noteInput) return;
+    var input = noteInput, target = noteTarget;
+    var value = cleanNote(input.value);
+    noteInput = null; noteTarget = null;
+    input.remove();
+    if (!cancel) { if (target.page) pageNote = value; else target.item.note = value; }
+    hideSheet(); persist(); mark();
+    if (focus) (target.page ? pageBtn : target.item.node).focus();
+  }
+  function openNote(target) {
+    finishNote(false, false);
+    noteTarget = target; noteInput = element("textarea", "note-input", document.body);
+    noteInput.rows = 3; noteInput.setAttribute("aria-label", t("noteLabel"));
+    noteInput.value = target.page ? pageNote : target.item.note;
+    noteInput.addEventListener("blur", function () { finishNote(false, false); });
+    noteInput.addEventListener("keydown", function (e) {
+      // Plain Enter stays a newline (it also confirms IME text); Ctrl/Cmd+Enter saves.
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !composing(e)) { e.preventDefault(); finishNote(false, true); }
+      else if (e.key === "Escape") { e.preventDefault(); finishNote(true, true); }
+    });
+    placeNote(); noteInput.focus();
+    if (noteInput) noteInput.setSelectionRange(noteInput.value.length, noteInput.value.length);
+  }
   items.forEach(function (it) {
+    it.node.addEventListener("click", function () { if (commenting) openNote({ item: it }); });
     if (!it.svg) return;
-    it.node.addEventListener("click", function () { if (editing) openSvg(it); });
+    it.node.addEventListener("click", function () { if (editing && !commenting) openSvg(it); });
     it.node.addEventListener("keydown", function (e) {
-      if (editing && (e.key === " " || (e.key === "Enter" && !composing(e)))) { e.preventDefault(); openSvg(it); }
+      if (editing && (e.key === " " || (e.key === "Enter" && !composing(e)))) {
+        e.preventDefault();
+        if (commenting) openNote({ item: it }); else openSvg(it);
+      }
     });
   });
+  function setCommenting(on) {
+    finishSvg(false, false); finishNote(false, false);
+    commenting = on;
+    document.body.classList.toggle("fixwords-commenting", on);
+    items.forEach(function (it) {
+      if (it.svg) return;
+      if (on) it.node.removeAttribute("contenteditable"); else if (editing) it.node.setAttribute("contenteditable", "plaintext-only");
+    });
+    render();
+  }
   function setEditing(on) {
-    if (!on) finishSvg(false, false);
+    if (!on) { finishSvg(false, false); if (commenting) setCommenting(false); }
     editing = on;
     document.body.classList.toggle("fixwords-editing", on);
     items.forEach(function (it) {
@@ -497,6 +622,11 @@
   }
   start.addEventListener("click", function () { if (!editing) setEditing(true); });
   toggle.addEventListener("click", function () { setEditing(!editing); });
+  commentBtn.addEventListener("click", function () {
+    if (!editing) setEditing(true);
+    setCommenting(!commenting);
+  });
+  pageBtn.addEventListener("click", function () { openNote({ page: true }); });
   document.addEventListener("input", function (e) {
     if (e.target.hasAttribute && e.target.hasAttribute("data-fixwords-editable")) { hideSheet(); persist(); mark(); }
   });
@@ -509,8 +639,8 @@
     if (document.body.classList.contains("fixwords-editing") && e.target.closest("[data-fixwords-editable]") && e.target.closest("a,button")) e.preventDefault();
   }, true);
   send.addEventListener("click", function () {
-    finishSvg(false, false);
-    if (!changes().length) { status.style.opacity = ".25"; window.setTimeout(function () { status.style.opacity = "1"; }, 180); return; }
+    finishSvg(false, false); finishNote(false, false);
+    if (!total()) { status.style.opacity = ".25"; window.setTimeout(function () { status.style.opacity = "1"; }, 180); return; }
     if (busy) return; busy = true; render();
     // Desktop browsers also expose Web Share, but a copy is what people there expect; the sheet still offers sharing.
     (window.matchMedia("(pointer:coarse)").matches ? shareReport : copyReport)(report());
@@ -529,15 +659,16 @@
   }
   close.addEventListener("click", function () { setClosed(true); });
   handle.addEventListener("click", function () { setClosed(false); });
-  reset.addEventListener("pointerdown", function () { finishSvg(true, false); });
+  reset.addEventListener("pointerdown", function () { finishSvg(true, false); finishNote(true, false); });
   reset.addEventListener("click", function () {
-    finishSvg(true, false);
-    if (!changes().length || !window.confirm(t("confirm"))) return;
-    items.forEach(function (it) { put(it, it.original); });
+    finishSvg(true, false); finishNote(true, false);
+    if (!total() || !window.confirm(t("confirm"))) return;
+    items.forEach(function (it) { put(it, it.original); it.note = ""; });
+    pageNote = "";
     sent = ""; hideSheet(); persist(); mark();
   });
   window.addEventListener("beforeunload", function (e) { if (unsent()) { e.preventDefault(); e.returnValue = ""; } });
-  window.addEventListener("resize", function () { layout(); placeSvg(); });
+  window.addEventListener("resize", function () { layout(); placeSvg(); placeNote(); });
   if (typeof ResizeObserver !== "undefined") new ResizeObserver(layout).observe(bar);
   setEditing(false);
   setClosed(closed);
