@@ -113,6 +113,78 @@ python3 fixwords.py hash                     # the hash, if your CSP is sent as 
 
 The script adds its own `<style>` element, so a policy that forbids inline styles will leave the bar unstyled.
 
+## Learn from the fixes you receive
+
+Save a received report as `report.txt`, then run these commands (Python 3, stdlib only):
+
+```sh
+python3 fixwords.py log report.txt             # or: log - < report.txt
+python3 fixwords.py log report.txt --genre guide --doc 'Garden leaflet'
+python3 fixwords.py learn
+python3 fixwords.py stats
+```
+
+The log and generated files live in `~/.local/share/fixwords/`, or `$FIXWORDS_HOME` when nonempty.
+The directory is private (0700), files are 0600, and writes use atomic replacement. Nothing is sent
+anywhere. Japanese and English reports, including comments, are supported. Logging the same report
+again adds nothing. `--doc` overrides its title; `--genre` overrides its optional Type/種類 line.
+
+`learn` produces three files, overwriting the previous generated versions:
+
+- `prh.yml`: literal word preferences seen at least three times across at least two documents.
+- `candidates.md`: other pairs, their counts and context, with commands to accept or reject each.
+- `digest.md`: evidence by genre for deletions, shortenings, comments (questions marked), and repeated
+  unpromoted pairs. Each evidence section is limited to 40 entries, fenced as untrusted reader feedback; quoted texts are capped at 200 characters.
+
+For example, invented garden leaflets might repeatedly change `utilize` to `use`. One edit stays a
+candidate. Three edits across two documents promote it. You can decide sooner:
+
+```sh
+python3 fixwords.py accept utilize use
+python3 fixwords.py reject utilize use
+```
+
+Either command regenerates the outputs; the latest decision wins. Punctuation-only changes, pure
+insertions, and patterns that would also match the corrected text never enter the dictionary, even
+when accepted. Single-character and pure hiragana patterns of at most two characters are also excluded.
+Ineligible pairs are hidden from candidates; accept/reject explains the reason and exits with status 1.
+Latin-only patterns use word boundaries. Use two shell-quoted arguments when either text contains `=`;
+the single `B=A` form still works with exactly one `=`. Word pairs use character diffs widened to
+script runs, not a morphological dictionary: kanji keeps following hiragana, and a shared leading
+kanji run stays as context only if the remaining before text starts with a non-kanji character. Thus `確認を行う` → `確認する` yields `を行う` → `する`.
+Review candidates before accepting them: context can change which wording fits.
+
+Point an existing textlint prh dictionary at the generated file with `imports:` (paths are relative
+to the importing dictionary; adjust this example to your location):
+
+```yaml
+imports:
+  - /absolute/path/to/fixwords/prh.yml
+```
+
+Enable the prh rule in your textlint configuration. Run `learn` first so the imported file exists.
+Give `digest.md` to an LLM with: “Summarize this evidence into style-guide.md, grouped by genre;
+quote counts and do not invent rules.” Save the result beside the digest, review and trim it, then
+add a pointer in your agent's AGENTS.md or CLAUDE.md:
+
+> Read ~/.local/share/fixwords/style-guide.md before writing.
+
+Adjust that path if you use `FIXWORDS_HOME`. The tool makes no LLM call and does not overwrite your
+reviewed guide. Regenerate the guide when enough new evidence has accumulated.
+
+`stats` shows monthly report batches (distinct document + timestamp), edits and comments per report,
+and a repeat rate: the share of non-punctuation hunks whose pair was already promoted by the end of
+the previous month, using historical logs and decisions. The first month is the baseline. A falling
+repeat rate without rising edits per report suggests progress; comments track content feedback
+separately. Matching prose style-guide rules is not measured automatically.
+
+Word choices, deletions, shortening, and comments can inform the guide. Reordering, moved or added
+sections, and rewrites spanning inline links or bold text are not visible as document-level changes;
+keep giving direct feedback on those.
+
+Learning limits: concurrent writes are not locked and can lose updates; run learning commands sequentially.
+Document identity uses titles: identical titles merge, while retitled revisions count as separate documents.
+
 ## Limits
 
 - A piece of text is editable when its element contains only text and line breaks. A sentence with a link or
