@@ -425,7 +425,8 @@ test('comments: the field never hides under the bar on a phone, and keyboard use
   const p = await open('en', { viewport: { width: 390, height: 640 }, hasTouch: true });
   await p.route('**/tall.html', route => route.fulfill({contentType:'text/html; charset=utf-8', body:
     '<html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0">' +
-    '<p id="near" style="margin:540px 16px 0">Near the bottom</p><p style="height:400px">Filler</p>' +
+    '<p id="own" tabindex="-1" role="note">Own stop</p>' +
+    '<p id="near" style="margin:500px 16px 0">Near the bottom</p><p style="height:400px">Filler</p>' +
     '<script src="/fixwords.js"></script></body></html>'}));
   await p.goto(env.base + '/tall.html');
   await start(p);
@@ -444,11 +445,16 @@ test('comments: the field never hides under the bar on a phone, and keyboard use
   await p.keyboard.press('Escape');
   // Keyboard: the text is focusable in comment mode, Enter opens the field; leaving comment mode removes the tab stop.
   assert.equal(await p.locator('#near').getAttribute('tabindex'), '0');
+  assert.equal(await p.locator('#near').getAttribute('role'), 'button');
+  assert.equal(await p.locator('#own').getAttribute('tabindex'), '-1');
   await p.locator('#near').focus(); await p.keyboard.press('Enter');
   assert.equal(await p.locator('#fixwords-note-input').count(), 1);
   await p.keyboard.press('Escape');
   await commentToggle(p).click();
   assert.equal(await p.locator('#near').getAttribute('tabindex'), null);
+  assert.equal(await p.locator('#near').getAttribute('role'), null);
+  assert.equal(await p.locator('#own').getAttribute('tabindex'), '-1');
+  assert.equal(await p.locator('#own').getAttribute('role'), 'note');
   await done(p);
 });
 test('comments: phone width, textarea stays in view, noted text survives an edit of the same element', async () => {

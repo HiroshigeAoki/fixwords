@@ -587,7 +587,8 @@
     it.node.addEventListener("click", function () { if (commenting) openNote({ item: it }); });
     if (!it.svg) {
       it.node.addEventListener("keydown", function (e) {
-        if (commenting && (e.key === " " || (e.key === "Enter" && !composing(e)))) { e.preventDefault(); openNote({ item: it }); }
+        if (!commenting || e.target !== it.node || e.ctrlKey || e.metaKey || e.altKey) return;
+        if (e.key === " " || (e.key === "Enter" && !composing(e))) { e.preventDefault(); openNote({ item: it }); }
       });
       return;
     }
@@ -601,18 +602,20 @@
   });
   function setCommenting(on) {
     finishSvg(false, false); finishNote(false, false);
+    if (commenting === on) { render(); return; }
     commenting = on;
     document.body.classList.toggle("fixwords-commenting", on);
     items.forEach(function (it) {
       if (it.svg) return;
-      // Text is reachable by Tab in comment mode; the page's own tabindex comes back afterwards.
+      // Text is a button reachable by Tab in comment mode; the page's own tabindex and role come back afterwards.
       if (on) {
         it.node.removeAttribute("contenteditable");
-        it.ownTab = it.node.getAttribute("tabindex");
-        if (it.ownTab == null) it.node.setAttribute("tabindex", "0");
+        it.ownTab = it.node.getAttribute("tabindex"); it.ownRole = it.node.getAttribute("role");
+        if (it.ownTab === null) it.node.setAttribute("tabindex", "0");
+        it.node.setAttribute("role", "button");
       } else {
         if (it.ownTab === null) it.node.removeAttribute("tabindex");
-        delete it.ownTab;
+        if (it.ownRole === null) it.node.removeAttribute("role"); else it.node.setAttribute("role", it.ownRole);
         if (editing) it.node.setAttribute("contenteditable", "plaintext-only");
       }
     });
