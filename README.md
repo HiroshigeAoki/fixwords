@@ -218,7 +218,9 @@ Document identity uses titles: identical titles merge, while retitled revisions 
 ## Limits
 
 - A sentence with a link or bold word inside is edited part by part: the text before it, the link or bold
-  word, and the text after it. The link itself stays.
+  word, and the text after it. The link itself stays. For this the script wraps such text in a
+  `<fixwords-text>` element when the page loads; page styles that count child elements (`:first-child` and the
+  like) can see it. Text in labels, summaries and buttons is not split.
 - Text drawn in images or on a canvas cannot be edited. SVG labels are single-line.
 - The list tells the author what to change; it does not change the source file.
 - Edits live in one browser on one device.
