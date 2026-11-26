@@ -4,6 +4,8 @@
 
 共有したページの文言を、見た人が自分で直せるようにする小さな道具です。
 
+<p><img src="docs/images/edit-ja.png" width="440" alt="文言を直すモードのパン屋のページ。最初の文と図の中の文字が書き換えられて色が付き、下のバーに「2 か所を直しました」と出ている。"></p>
+
 モックや下書きのページを作って（AI に作らせた場合も含みます）、コードを書かない同僚に見てもらったとします。
 同僚は、直したい言い回しを見つけます。fixwords を入れたページなら、同僚は画面の上でその文字を書き換え、ボタンを1つ
 押して、できた一覧をチャットやメールに貼って送るだけです。
@@ -54,6 +56,8 @@ AI に作業させている場合は、こう頼めば済みます。
 5. 「直した内容を送る」を押す。スマホやタブレットでは共有の画面が開きます。パソコンでは一覧がコピーされます。
    それを作った人へのチャットやメールに貼って送ります。
 
+<p><img src="docs/images/comment-ja.png" width="440" alt="コメントモードのパン屋のページ。ある文には保存済みのコメントがあり点線の下線が付いている。別の文にはコメント欄が開いて質問が書かれている。"></p>
+
 送る一覧は次のようになります。コメントは直しのあとに続きます。
 
 ```
@@ -68,6 +72,10 @@ AI に作業させている場合は、こう頼めば済みます。
 3. コメント（ページ全体）
    内容：全体にもう少し短くていいと思います。
 ```
+
+チャットに貼ったところ:
+
+<p><img src="docs/images/paste-ja.png" width="440" alt="直す人が一覧をチャットに貼ったところ。2か所の書き換えと1件のコメントが並んでいる。"></p>
 
 直した内容とコメントは、そのブラウザーの中（localStorage）に残ります。ページを閉じても、あとで続きができます。
 一覧を送るまでは、誰にも届きません。
@@ -115,6 +123,8 @@ NG：2
 未判定：3, 5
 ```
 
+<p><img src="docs/images/verdicts-ja.png" width="440" alt="5つの項目それぞれに OK・NG・例外のボタンが付いた受け入れ確認の一覧。1番と4番は OK、2番は NG、3番と5番は未判定。"></p>
+
 項目の文字は、これまでどおり直したりコメントしたりできます。「すべて元に戻す」は判定も消します。
 
 ## CSP が厳しいページ、1ファイルにまとめたい場合
@@ -149,6 +159,14 @@ python3 fixwords.py log report.txt             # または: log - < report.txt
 python3 fixwords.py log report.txt --genre 案内 --doc '庭の案内'
 python3 fixwords.py learn
 python3 fixwords.py stats
+```
+
+```mermaid
+flowchart LR
+  report["届いた一覧"] --> log["fixwords.py log"] --> store[("ログ")] --> learn["fixwords.py learn"]
+  learn --> prh["prh.yml"] --> lint["textlint"]
+  learn --> cand["candidates.md"] --> decide{"採用 / 却下"} --> learn
+  learn --> digest["digest.md"] --> guide["style-guide.md<br>(LLM の要約を自分で確認)"] --> agent["コーディング AI"]
 ```
 
 ログと生成ファイルは `~/.local/share/fixwords/` に保存します。`FIXWORDS_HOME` で変更できます。空なら既定の保存先を使います。
@@ -232,6 +250,8 @@ npm ci && npx playwright install chromium-headless-shell
 npm test                                                  # ブラウザーのテスト
 python3 -m unittest discover -s tests -p 'test_*.py'     # コマンドのテスト
 ```
+
+README の画像は `node docs/images/capture.cjs` で作り直します。
 
 ## ライセンス
 
