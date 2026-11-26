@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>会議室予約（モック）</title>
+  <style>
+    body { max-width: 42rem; margin: auto; padding: 24px; font: 17px/1.6 'Noto Sans CJK JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; color: #1f2933; background: #e9eef4; }
+    .card { background: #fff; border: 1px solid #d3dbe4; border-radius: 12px; padding: 24px; }
+    h1, h2 { line-height: 1.2; }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    h2 { margin: 24px 0 8px; font-size: 20px; }
+    p { margin: 0 0 16px; }
+    .row { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; }
+    .row span { flex: none; width: 5.5em; color: #52606d; font-size: 15px; }
+    .row div { flex: 1; border: 1px solid #c5cfdb; border-radius: 8px; padding: 8px 12px; background: #f7f9fb; }
+    .btn { display: block; margin: 16px 0; padding: 10px 16px; border-radius: 8px; background: #2f6fdb; color: #fff; font-weight: 600; text-align: center; }
+    .note { margin: 0; font-size: 14px; color: #52606d; }
+    svg { display: block; max-width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>会議室を予約する</h1>
+    <p>ご希望の日時を選択して予約を行ってください。</p>
+    <div class="row"><span>会議室</span><div>会議室A（8席）</div></div>
+    <div class="row"><span>日付</span><div>4月14日（火）</div></div>
+    <div class="row"><span>時間</span><div>10:00〜11:00</div></div>
+    <div class="btn">予約を送信</div>
+    <p class="note">予約は取り消せません。</p>
+    <h2>予約のあと</h2>
+    <svg viewBox="0 0 400 100" width="400" role="img" aria-label="予約のあとの流れ">
+      <rect x="4" y="10" width="200" height="70" rx="12" fill="#dbe7fb"/>
+      <rect x="262" y="10" width="134" height="70" rx="12" fill="#d9f0e3"/>
+      <path d="M210 45h46m-8-8 8 8-8 8" fill="none" stroke="#52606d" stroke-width="2"/>
+      <text x="20" y="51" font-size="18">承認待ち</text>
+      <text x="278" y="51" font-size="18">利用できます</text>
+    </svg>
+  </div>
+  <script src="../../../fixwords.js"></script>
+</body>
+</html>

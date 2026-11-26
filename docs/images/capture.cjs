@@ -13,19 +13,19 @@ const WIDTH = 600;
 
 const TEXT = {
   en: {
-    intro: 'Warm bread for a slower morning.', introNew: 'Warm bread for a slow morning.',
-    label: 'Bake the loaf', labelNew: 'Bake the bread',
-    asked: 'Baked fresh each morning.', question: 'Is this every day, holidays too?',
-    other: 'Our oat loaf has a crisp crust and a soft centre.', otherNote: 'Does it contain nuts?',
-    before: 'Before:', comment: 'Comment on:', title: 'The little bakery — Wording changes',
+    intro: 'Please select your desired date and time to make a booking.', introNew: 'Pick a date and time to book.',
+    label: 'Awaiting approval', labelNew: 'Waits for approval',
+    question: 'Say who approves it?',
+    other: 'Bookings cannot be cancelled.', otherNote: 'Not even the day before?',
+    before: 'Before:', comment: 'Comment on:', title: 'Room booking (mockup) — Wording changes',
     checklistTitle: 'Acceptance check',
   },
   ja: {
-    intro: 'ゆっくりした朝のための、あたたかいパン。', introNew: 'ゆっくりした朝に、あたたかいパンを。',
-    label: 'パンを焼く', labelNew: 'パンを焼き上げる',
-    asked: '毎朝焼きたてです。', question: '祝日も同じですか？',
-    other: 'オーツ麦の食パンは、皮はぱりっと、中はふんわりしています。', otherNote: 'ナッツは入りますか？',
-    before: '元：', comment: 'コメント（対象：', title: '小さなパン屋 文言の直し',
+    intro: 'ご希望の日時を選択して予約を行ってください。', introNew: '使いたい日時を選んで予約します。',
+    label: '承認待ち', labelNew: '承認を待ちます',
+    question: '誰が承認するかも書きませんか？',
+    other: '予約は取り消せません。', otherNote: '前日でも取り消せませんか？',
+    before: '元：', comment: 'コメント（対象：', title: '会議室予約（モック） 文言の直し',
     checklistTitle: '受け入れ確認',
   },
 };
@@ -108,7 +108,7 @@ async function comment(page, selector, value, save) {
 
 async function editShot(browser, lang) {
   const s = TEXT[lang];
-  const { context, page } = await open(browser, `bakery.${lang}.html`);
+  const { context, page } = await open(browser, `booking.${lang}.html`);
   await makeEdits(page, s);
   await assertEdits(page, s);
   const file = await shoot(page, `edit-${lang}.png`);
@@ -118,15 +118,15 @@ async function editShot(browser, lang) {
 
 async function commentShot(browser, lang) {
   const s = TEXT[lang];
-  const { context, page } = await open(browser, `bakery.${lang}.html`);
+  const { context, page } = await open(browser, `booking.${lang}.html`);
   await page.locator('#fixwords-title').click();
   await page.locator('#fixwords-comment').click();
   assert(await page.locator('#fixwords-comment[aria-pressed=true]').count() === 1, 'comment mode is on');
-  await comment(page, `p:text-is("${s.other}")`, s.otherNote, true);
-  assert(await page.locator(`p:text-is("${s.other}")[data-fixwords-noted]`).count() === 1, 'saved comment has the dotted underline attribute');
-  await comment(page, `p:text-is("${s.asked}") >> nth=1`, s.question, false);
+  await comment(page, `p:text-is("${s.intro}")`, s.question, true);
+  assert(await page.locator(`p:text-is("${s.intro}")[data-fixwords-noted]`).count() === 1, 'saved comment has the dotted underline attribute');
+  await comment(page, `p:text-is("${s.other}")`, s.otherNote, false);
   const box = page.locator('#fixwords-note-input');
-  assert(await box.isVisible() && await box.inputValue() === s.question, 'comment box is open with the question typed');
+  assert(await box.isVisible() && await box.inputValue() === s.otherNote, 'comment box is open with the note typed');
   const file = await shoot(page, `comment-${lang}.png`);
   await context.close();
   return file;
@@ -135,18 +135,18 @@ async function commentShot(browser, lang) {
 // Returns the text fixwords copied to the clipboard for the edits plus one comment.
 async function copiedText(browser, lang) {
   const s = TEXT[lang];
-  const { context, page } = await open(browser, `bakery.${lang}.html`, { clipboard: true });
+  const { context, page } = await open(browser, `booking.${lang}.html`, { clipboard: true });
   await makeEdits(page, s);
   await assertEdits(page, s);
   await page.locator('#fixwords-comment').click();
-  await comment(page, `p:text-is("${s.asked}") >> nth=1`, s.question, true);
+  await comment(page, `p:text-is("${s.other}")`, s.otherNote, true);
   await page.locator('#fixwords-send').click();
   await page.locator('#fixwords-note[data-mode=copied]').waitFor();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   await context.close();
   assert(copied.startsWith(s.title), 'clipboard text starts with the report title: ' + JSON.stringify(copied.slice(0, 60)));
   assert(copied.includes(s.before) && copied.includes(s.introNew) && copied.includes(s.labelNew) &&
-    copied.includes(s.comment) && copied.includes(s.question), 'clipboard text has the edits and the comment');
+    copied.includes(s.comment) && copied.includes(s.otherNote), 'clipboard text has the edits and the comment');
   return copied;
 }
 

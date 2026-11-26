@@ -4,20 +4,20 @@
 
 Let the people you shared a page with fix its wording themselves.
 
-<p><img src="docs/images/edit-en.png" width="440" alt="A bakery page in edit mode. The first sentence and a label in the figure were rewritten and are highlighted, and the fixwords bar at the bottom shows 2 changes."></p>
+<p><img src="docs/images/edit-en.png" width="440" alt="A room booking mockup in edit mode. The lead sentence and a label in the figure were rewritten and are highlighted, and the fixwords bar at the bottom shows "Changes: 2"."></p>
 
 You made a mockup or a draft page (perhaps with an AI coding agent) and sent it to colleagues who do not write
 code. They spot wording they would change. With fixwords on the page they rewrite the text right where they see
 it, press one button, and paste the result into a chat or an email to you:
 
 ```
-The little bakery — Wording changes
+Room booking (mockup) — Wording changes
 
-1. Before: Warm bread for a slower morning.
-   After: Warm bread for a slow morning.
+1. Before: Please select your desired date and time to make a booking.
+   After: Pick a date and time to book.
 
-2. (figure) Before: Bake the loaf
-   After: Bake the bread
+2. (figure) Before: Awaiting approval
+   After: Waits for approval
 ```
 
 You apply the list to the source yourself, or paste it to your agent.
@@ -58,7 +58,7 @@ Working with a coding agent? Ask it:
 5. Press **Send your changes**. On a touch device (phone, tablet) the share sheet opens; on a computer the list
    is copied to the clipboard. Paste it into a chat or an email to the author.
 
-<p><img src="docs/images/comment-en.png" width="440" alt="Comment mode on the bakery page: one comment is saved on a sentence, shown with a dotted underline, and a comment box with a question is open on another sentence."></p>
+<p><img src="docs/images/comment-en.png" width="440" alt="Comment mode on the room booking mockup: one comment is saved on the lead sentence, shown with a dotted underline, and a comment box with a question is open on the cancellation note."></p>
 
 The list looks like this. Comments come after the edits:
 
@@ -77,7 +77,7 @@ Spring menu draft — Wording changes
 
 Pasted into a chat:
 
-<p><img src="docs/images/paste-en.png" width="440" alt="A chat where the reader has pasted the list of changes: two rewrites and one comment."></p>
+<p><img src="docs/images/paste-en.png" width="440" alt="A chat where the reader has pasted the list of changes: two rewrites and one comment on the cancellation note."></p>
 
 Edits and comments are kept in that browser (localStorage) until they are reset, so the reader can close the page and come
 back. They are not shared with anyone until the reader sends the list.
