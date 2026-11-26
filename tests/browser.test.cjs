@@ -644,6 +644,7 @@ for (const lang of ['en', 'ja']) {
     await commentToggle(p).click();
     assert.equal(await hint.textContent(), S.hint);
     assert.equal(await hint.isVisible(), true);
+    assert.equal(await hint.evaluate(n => getComputedStyle(n).color), 'rgb(191, 219, 254)');
     assert.equal(await p.locator('#fixwords-guide').isVisible(), false);
     assert.equal(await commentToggle(p).textContent(), S.done);
     assert.equal(await commentToggle(p).evaluate(n => getComputedStyle(n).backgroundColor), 'rgb(37, 99, 235)');
