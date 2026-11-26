@@ -421,6 +421,36 @@ test('comments: SVG labels, page note, report, reset and counts in Japanese', as
   assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('fixwords:' + location.pathname)).notes), undefined);
   await done(p);
 });
+test('comments: the field never hides under the bar on a phone, and keyboard users can comment on text', async () => {
+  const p = await open('en', { viewport: { width: 390, height: 640 }, hasTouch: true });
+  await p.route('**/tall.html', route => route.fulfill({contentType:'text/html; charset=utf-8', body:
+    '<html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0">' +
+    '<p id="near" style="margin:540px 16px 0">Near the bottom</p><p style="height:400px">Filler</p>' +
+    '<script src="/fixwords.js"></script></body></html>'}));
+  await p.goto(env.base + '/tall.html');
+  await start(p);
+  await commentToggle(p).click();
+  const clear = async () => {
+    const box = await p.locator('#fixwords-note-input').boundingBox();
+    const bar = await p.locator('#fixwords-bar').boundingBox();
+    assert.ok(box.y + box.height <= bar.y, 'field bottom ' + (box.y + box.height) + ' is under the bar top ' + bar.y);
+    assert.ok(box.y >= 0);
+  };
+  await p.locator('#fixwords-pagenote').click();
+  await clear();
+  await p.keyboard.press('Escape');
+  await p.locator('#near').click();
+  await clear();
+  await p.keyboard.press('Escape');
+  // Keyboard: the text is focusable in comment mode, Enter opens the field; leaving comment mode removes the tab stop.
+  assert.equal(await p.locator('#near').getAttribute('tabindex'), '0');
+  await p.locator('#near').focus(); await p.keyboard.press('Enter');
+  assert.equal(await p.locator('#fixwords-note-input').count(), 1);
+  await p.keyboard.press('Escape');
+  await commentToggle(p).click();
+  assert.equal(await p.locator('#near').getAttribute('tabindex'), null);
+  await done(p);
+});
 test('comments: phone width, textarea stays in view, noted text survives an edit of the same element', async () => {
   const p = await open('en', { hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
   await start(p);

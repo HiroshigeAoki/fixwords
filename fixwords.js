@@ -501,8 +501,9 @@
   var svgInput = null, svgItem = null;
   // Safari ends the composition before the Enter that confirmed it; that keydown carries keyCode 229.
   function composing(e) { return e.isComposing || e.keyCode === 229; }
-  // Position a floating field next to a node: centred on it ("center"), or just below it, above if that does not fit ("below").
-  function place(box, node, width, where) {
+  // Position a floating field next to a node: centred on it ("center"), or just below it, above if that does not
+  // fit ("below"). A "below" field stays above floor (the top of the bar), else it would open hidden under it.
+  function place(box, node, width, where, floor) {
     var r = node.getBoundingClientRect();
     var viewport = document.documentElement.clientWidth;
     width = Math.max(0, Math.min(width, viewport - 16));
@@ -513,8 +514,10 @@
     var left = Math.max(8, Math.min(r.left + (r.width - width) / 2, viewport - width - 8));
     var top = r.top + (r.height - zero.height) / 2;
     if (where === "below") {
+      floor = Math.min(floor, window.innerHeight) - 8;
       top = r.bottom + 6;
-      if (top + zero.height > window.innerHeight - 8) top = Math.max(8, r.top - zero.height - 6);
+      if (top + zero.height > floor) top = r.top - zero.height - 6;
+      if (top < 8) top = Math.max(8, floor - zero.height);
     }
     box.style.left = left - zero.left + "px";
     box.style.top = top - zero.top + "px";
@@ -551,8 +554,10 @@
   var noteInput = null, noteTarget = null;
   function placeNote() {
     if (!noteInput) return;
-    var node = noteTarget.page ? pageBtn : noteTarget.item.node;
-    place(noteInput, node, Math.max(280, node.getBoundingClientRect().width), "below");
+    // The page comment opens above the bar, whose button started it.
+    var node = noteTarget.page ? bar : noteTarget.item.node;
+    var floor = bar.hidden ? window.innerHeight : bar.getBoundingClientRect().top;
+    place(noteInput, node, Math.max(280, node.getBoundingClientRect().width), "below", floor);
   }
   function finishNote(cancel, focus) {
     if (!noteInput) return;
@@ -580,7 +585,12 @@
   }
   items.forEach(function (it) {
     it.node.addEventListener("click", function () { if (commenting) openNote({ item: it }); });
-    if (!it.svg) return;
+    if (!it.svg) {
+      it.node.addEventListener("keydown", function (e) {
+        if (commenting && (e.key === " " || (e.key === "Enter" && !composing(e)))) { e.preventDefault(); openNote({ item: it }); }
+      });
+      return;
+    }
     it.node.addEventListener("click", function () { if (editing && !commenting) openSvg(it); });
     it.node.addEventListener("keydown", function (e) {
       if (editing && (e.key === " " || (e.key === "Enter" && !composing(e)))) {
@@ -595,7 +605,16 @@
     document.body.classList.toggle("fixwords-commenting", on);
     items.forEach(function (it) {
       if (it.svg) return;
-      if (on) it.node.removeAttribute("contenteditable"); else if (editing) it.node.setAttribute("contenteditable", "plaintext-only");
+      // Text is reachable by Tab in comment mode; the page's own tabindex comes back afterwards.
+      if (on) {
+        it.node.removeAttribute("contenteditable");
+        it.ownTab = it.node.getAttribute("tabindex");
+        if (it.ownTab == null) it.node.setAttribute("tabindex", "0");
+      } else {
+        if (it.ownTab === null) it.node.removeAttribute("tabindex");
+        delete it.ownTab;
+        if (editing) it.node.setAttribute("contenteditable", "plaintext-only");
+      }
     });
     render();
   }
