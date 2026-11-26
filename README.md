@@ -45,10 +45,31 @@ Working with a coding agent? Ask it:
 
 1. Press **Fix wording**.
 2. Tap any text and rewrite it. Changed text is highlighted.
-3. Press **Send your changes**. On a touch device (phone, tablet) the share sheet opens; on a computer the list
+3. To ask a question or leave a remark instead of rewriting, press **💬 Comment**, tap the text and write it
+   (Ctrl/Cmd+Enter or tapping elsewhere saves). **Comment on the whole page** adds a note that belongs to no text.
+   Commented text gets a dotted underline.
+4. To take back a change, press **Reset changes**. It opens a list of the changed texts; **Undo** on a row reverts
+   just that text, and **Restore** in the notice brings the last one back until the list is closed. **Undo all**
+   reverts every change and deletes every comment after a confirmation. To remove a comment, empty its box.
+5. Press **Send your changes**. On a touch device (phone, tablet) the share sheet opens; on a computer the list
    is copied to the clipboard. Paste it into a chat or an email to the author.
 
-Edits are kept in that browser (localStorage) until they are reset, so the reader can close the page and come
+The list looks like this. Comments come after the edits:
+
+```
+Spring menu draft — Wording changes
+
+1. Before: Warm bread for slow mornings.
+   After: Warm bread for a slow morning.
+
+2. Comment on: Open from 7 am
+   Note: Same on holidays?
+
+3. Comment (whole page)
+   Note: Shorter overall would be fine.
+```
+
+Edits and comments are kept in that browser (localStorage) until they are reset, so the reader can close the page and come
 back. They are not shared with anyone until the reader sends the list.
 
 ## Settings (optional)
@@ -64,6 +85,7 @@ Add a meta tag with JSON. Every key is optional.
 | `title` | Title line of the list. Default: the page title. |
 | `send_to` | A short instruction (up to 60 characters) shown after copying or sharing, telling the reader where to send the list. |
 | `skip` | CSS selector for parts that must not be edited. |
+| `genre` | Free text (up to 40 characters, such as `Product page`). Adds a `Type: ...` line under the title of the list. |
 | `lang` | `"en"` or `"ja"`. Default: Japanese when the page's `<html lang>` starts with `ja`, English for any other `lang`; a page with no `lang` follows the browser language. |
 
 You can also mark a part as not editable in the HTML with the `data-no-edit` attribute.
