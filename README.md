@@ -109,6 +109,7 @@ To have the reader give each item one of a few verdicts instead of writing about
 ```
 
 - Each tagged item gets a row of buttons, shown all the time. Tapping a choice selects it; tapping it again clears it.
+- Choices containing `?` or `？` open an optional reason comment on the item's first editable text, unless it already has a comment. Set `markNote` to an array of labels from `marks` to choose which verdicts ask for a reason (invalid entries are ignored), or `[]` to disable it; cancelling or saving empty keeps the verdict.
 - 1 to 6 choices, each up to 12 characters. Any other value turns verdicts off.
 - Put the attribute on an element that can hold a row of buttons, such as `li`, `div`, `p` or `td`, not on a `tr`.
 - An empty id becomes the item's position among the tagged items (1, 2, …). Items with the same id share one verdict, so give ids to all items or to none.

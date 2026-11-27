@@ -4,6 +4,7 @@
   window.__fixwords = true;
   var STRINGS = {
   "ja": {
+    "markNotePlaceholder": "「{choice}」の理由（任意）",
     "deleteRow": "🗑 この行を削除",
     "deleteItem": "🗑 この項目を削除",
     "deleteHeading": "🗑 この見出しを削除",
@@ -100,6 +101,7 @@
     "sendMarks": "結果を送る（{parts}）"
   },
   "en": {
+    "markNotePlaceholder": "Why \"{choice}\"? (optional)",
     "deleteRow": "🗑 Delete this row",
     "deleteItem": "🗑 Delete this item",
     "deleteHeading": "🗑 Delete this heading",
@@ -234,6 +236,9 @@
     });
   }
   if (choices.length > 6) choices = [];
+  var noteChoices = Array.isArray(config.markNote) ? choices.filter(function (choice) {
+    return config.markNote.indexOf(choice) >= 0;
+  }) : choices.filter(function (choice) { return /[?？]/.test(choice); });
   var saved = null;
   try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { /* Storage is optional. */ }
   // Closed: the bar is folded into a small handle so it does not cover the page.
@@ -305,7 +310,7 @@
         var b = document.createElement("button");
         b.type = "button"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", "false");
         b.textContent = choice; group.appendChild(b);
-        b.addEventListener("click", function () { setMark(id, marks[id] === choice ? "" : choice); });
+        b.addEventListener("click", function () { setMark(id, marks[id] === choice ? "" : choice, node, b); });
         return b;
       });
       node.appendChild(group);
@@ -510,9 +515,15 @@
     return lines.join("\n");
   }
 
-  function setMark(id, choice) {
+  function setMark(id, choice, node, button) {
     if (choice) marks[id] = choice; else delete marks[id];
     paintMarks(); hideSheet(); persist();
+    if (noteChoices.indexOf(choice) < 0) return;
+    // Items are collected in document order; use the clicked element even for shared verdict ids.
+    var it = items.filter(function (item) { return node.contains(item.node); })[0];
+    if (!it || it.note || suppressed(it)) return;
+    if (!editing) setEditing(true);
+    openNote({ item: it, choice: choice, returnFocus: button });
   }
   var sent = saved && saved.v === 1 && typeof saved.sent === "string" ? saved.sent : "";
   var destination = typeof config.send_to === "string" ? config.send_to.replace(/\s+/g, " ").trim() : "";
@@ -845,12 +856,13 @@
     if (!cancel) { if (target.page) pageNote = value; else target.item.note = value; }
     hideSheet(); persist(); mark();
     // While editing, focus goes back to the text (and its toolbar); otherwise to the pin that opened the note.
-    if (focus) (target.page ? pageBtn : editing || !target.item.pin || target.item.pin.hidden ? target.item.node : target.item.pin).focus();
+    if (focus) (target.returnFocus || (target.page ? pageBtn : editing || !target.item.pin || target.item.pin.hidden ? target.item.node : target.item.pin)).focus();
   }
   function openNote(target) {
     finishNote(false, false); hideSheet();
     noteTarget = target; noteInput = element("textarea", "note-input", document.body);
     noteInput.rows = 3; noteInput.setAttribute("aria-label", t("noteLabel"));
+    if (target.choice) noteInput.placeholder = t("markNotePlaceholder", { choice: target.choice });
     noteInput.value = target.page ? pageNote : target.item.note;
     noteInput.addEventListener("blur", function () { finishNote(false, false); });
     noteInput.addEventListener("keydown", function (e) {
