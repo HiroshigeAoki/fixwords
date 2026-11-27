@@ -943,6 +943,82 @@ async function openMarks(config, options = {}) {
 const verdicts = (p, id) => p.locator('#' + id + ' .fixwords-marks button');
 const checked = async (p, id) => (await verdicts(p, id).evaluateAll(b => b.map(x => x.getAttribute('aria-checked')))).join(',');
 const storedMarks = p => p.evaluate(() => (JSON.parse(localStorage.getItem('fixwords:' + location.pathname)) || {}).marks);
+test('marks: unsure choices open optional reasons in ja and en, save on the first text and report normally', async () => {
+  for (const lang of ['ja', 'en']) {
+    const p = await openMarks({ lang, marks: ['OK', '?', '保留？'] }, { permissions: ['clipboard-read', 'clipboard-write'] });
+    const button = verdicts(p, 'm2').nth(1);
+    await button.click(); // Starts editing without the idle pill.
+    assert.equal(await p.locator('#m2a').getAttribute('contenteditable'), 'plaintext-only');
+    const input = p.locator('#fixwords-note-input');
+    assert.equal(await input.getAttribute('placeholder'), lang === 'ja' ? '「?」の理由（任意）' : 'Why "?"? (optional)');
+    assert.equal(await input.evaluate(n => n === document.activeElement), true);
+    await input.fill('Need more detail');
+    await p.keyboard.press('Control+Enter');
+    assert.equal(await button.evaluate(n => n === document.activeElement), true);
+    await p.locator('#fixwords-send').click();
+    const report = await p.evaluate(() => navigator.clipboard.readText());
+    assert.ok(report.includes('?: 2') || report.includes('?：2'));
+    assert.ok(report.includes('Need more detail'));
+    const saved = await p.evaluate(() => JSON.parse(localStorage.getItem('fixwords:' + location.pathname)));
+    assert.equal(saved.notes.find(n => n.c === 'Need more detail').o, '支払い');
+    await button.click(); // Un-pick.
+    assert.equal(await input.count(), 0);
+    await verdicts(p, 'm2').nth(2).click(); // Existing comment is not reopened.
+    assert.equal(await input.count(), 0);
+    await done(p);
+  }
+});
+test('marks: cancel or save empty keeps the verdict, returns focus, and un-pick does not open', async () => {
+  const p = await openMarks({ marks: ['OK', '保留？'] });
+  const button = verdicts(p, 'm1').nth(1);
+  for (const key of ['Escape', 'Control+Enter']) {
+    await button.click();
+    const input = p.locator('#fixwords-note-input');
+    assert.equal(await input.getAttribute('placeholder'), '「保留？」の理由（任意）');
+    if (key === 'Escape') await input.fill('Discard this');
+    await p.keyboard.press(key);
+    assert.equal(await button.getAttribute('aria-checked'), 'true');
+    assert.equal(await button.evaluate(n => n === document.activeElement), true);
+    await button.click();
+    assert.equal(await input.count(), 0);
+    assert.equal(await button.getAttribute('aria-checked'), 'false');
+  }
+  const saved = await p.evaluate(() => JSON.parse(localStorage.getItem('fixwords:' + location.pathname)));
+  assert.equal((saved.notes || []).length, 0);
+  await done(p);
+});
+test('marks: reasons also open during editing, while elements without editable text only receive a verdict', async () => {
+  const p = await openMarks({ marks: ['OK', '?'] });
+  await start(p);
+  await verdicts(p, 'm1').nth(1).click();
+  assert.equal(await p.locator('#fixwords-note-input').isVisible(), true);
+  await p.keyboard.press('Escape');
+  await done(p);
+  const q = await openMarks({ marks: ['?'] });
+  await q.route('**/empty-mark.html', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body:
+    '<html lang="en"><head><meta name="fixwords" content=\'{"marks":["?"]}\'></head><body>' +
+    '<div id="empty" data-fixwords-mark="1"><img alt="Diagram"></div><script src="/fixwords.js"></script></body></html>' }));
+  await q.goto(env.base + '/empty-mark.html');
+  await verdicts(q, 'empty').first().click();
+  assert.equal(await verdicts(q, 'empty').first().getAttribute('aria-checked'), 'true');
+  assert.equal(await q.locator('#fixwords-note-input').count(), 0);
+  assert.equal(await q.locator('body').evaluate(n => n.classList.contains('fixwords-editing')), false);
+  await done(q);
+});
+test('marks: markNote overrides question defaults, ignores invalid entries, and an empty array disables reasons', async () => {
+  for (const markNote of [['Hold', 'Missing', 3], []]) {
+    const p = await openMarks({ lang: 'en', marks: ['OK', '?', 'Hold'], markNote });
+    await verdicts(p, 'm1').nth(1).click();
+    assert.equal(await p.locator('#fixwords-note-input').count(), 0);
+    await verdicts(p, 'm1').nth(2).click();
+    assert.equal(await p.locator('#fixwords-note-input').count(), markNote.length ? 1 : 0);
+    if (markNote.length) {
+      assert.equal(await p.locator('#fixwords-note-input').getAttribute('placeholder'), 'Why "Hold"? (optional)');
+      await p.keyboard.press('Escape');
+    }
+    await done(p);
+  }
+});
 test('marks: one radio group per item with the configured labels; invalid config adds none', async () => {
   const p = await openMarks({ marks: ['OK', 'NG', '例外'] });
   assert.equal(await p.locator('.fixwords-marks').count(), 4);
