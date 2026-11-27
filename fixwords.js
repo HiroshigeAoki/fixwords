@@ -744,8 +744,8 @@
   }
 
   function placeDeletedTags() {
-    blocks.forEach(function (b) {
-      if (!b.deleted || closed) { if (b.tag) { b.tag.remove(); b.tag = null; } return; }
+    var tagged = blocks.filter(function (b) {
+      if (!b.deleted || closed) { if (b.tag) { b.tag.remove(); b.tag = null; } return false; }
       if (!b.tag) {
         b.tag = button(t("deletedTag"), document.body); b.tag.className = "fixwords-deleted-tag";
         b.tag.addEventListener("click", function () {
@@ -754,8 +754,16 @@
         });
       }
       b.tag.style.left = b.tag.style.top = "0px";
-      var zero = b.tag.getBoundingClientRect(), r = b.node.getBoundingClientRect();
-      b.tag.style.left = Math.max(0, Math.min(r.left, document.documentElement.clientWidth - zero.width)) - zero.left + "px";
+      return true;
+    });
+    // As with pins, finish writes before measuring and positioning the tags.
+    var viewport = document.documentElement.clientWidth;
+    var rects = tagged.map(function (b) {
+      return { zero: b.tag.getBoundingClientRect(), node: b.node.getBoundingClientRect() };
+    });
+    tagged.forEach(function (b, i) {
+      var zero = rects[i].zero, r = rects[i].node;
+      b.tag.style.left = Math.max(0, Math.min(r.left, viewport - zero.width)) - zero.left + "px";
       b.tag.style.top = r.top - zero.height / 2 - zero.top + "px";
     });
   }
@@ -900,10 +908,10 @@
     finishNote(false, false); hideTools(); setDeleted(b, true); hideSheet(); persist(); mark();
     if (b.tag) b.tag.focus();
   });
-  function backToText() { (svgInput && svgItem === toolItem ? svgInput : toolItem.node).focus(); }
+  function backToText() { toolNode().focus(); }
   tools.addEventListener("keydown", function (e) {
     if (!toolItem || composing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
-    var buttons = Array.prototype.filter.call(tools.querySelectorAll("button"), function (b) { return !b.hidden; });
+    var buttons = [commentTool, deleteTool].filter(function (b) { return !b.hidden; });
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); backToText(); }
     else if (e.key === "Tab" && e.shiftKey && e.target === buttons[0]) { e.preventDefault(); backToText(); }
     else if (e.key === "Tab" && !e.shiftKey && e.target === buttons[buttons.length - 1]) {
@@ -945,7 +953,8 @@
   function syncEditable() {
     var on = editing;
     items.forEach(function (it) {
-      if (suppressed(it)) {
+      var deleted = suppressed(it);
+      if (deleted) {
         if (!it.deletedAttrs) it.deletedAttrs = { tabindex: it.node.getAttribute("tabindex") };
         it.node.removeAttribute("tabindex");
       } else if (it.deletedAttrs) {
@@ -959,7 +968,7 @@
       if (on && it.svg && !it.own) it.own = { tabindex: it.node.getAttribute("tabindex"), role: it.node.getAttribute("role") };
       if (!on && it.svg && !it.own) return;
       Object.keys(attrs).forEach(function (name) {
-        if (on && !suppressed(it)) it.node.setAttribute(name, attrs[name]);
+        if (on && !deleted) it.node.setAttribute(name, attrs[name]);
         else if (it.own && it.own[name] != null) it.node.setAttribute(name, it.own[name]);
         else it.node.removeAttribute(name);
       });
