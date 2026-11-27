@@ -27,6 +27,15 @@ class LearnTest(unittest.TestCase):
         return subprocess.run([sys.executable, str(ROOT / 'fixwords.py'), *args],
                               input=text, capture_output=True, text=True)
 
+    def test_log_skips_block_deletions(self):
+        for label, title in [('削除：段落', '庭 文言の直し'), ('Delete: Paragraph', 'Garden — Wording changes')]:
+            result = self.cli('log', '-', text=f'{title}\n\n1. {label}\n')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('logged 0 edits, 0 comments', result.stdout)
+        rows = fw.parse_report('Garden — Wording changes\n1. Delete: Block\n\n2. Before: Old\n   After: New\n\n3. Delete: Last')
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['after'], 'New')
+
     def test_review1_exact_labels(self):
         for title, label, value in [
             ('庭 文言の直し', '元（1か所目／全2か所・見出し「a」の下）：', 'see（図）：x'),

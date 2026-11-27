@@ -4,6 +4,15 @@
   window.__fixwords = true;
   var STRINGS = {
   "ja": {
+    "deleteRow": "🗑 この行を削除",
+    "deleteItem": "🗑 この項目を削除",
+    "deleteHeading": "🗑 この見出しを削除",
+    "deletePara": "🗑 この段落を削除",
+    "deletedTag": "削除 ・ 取り消す",
+    "deleteLine": "削除",
+    "statDeletes": "削除 {d} か所",
+    "sendStats": "直した内容を送る（{parts}）",
+
     "startIdle": "✎ 文言を直す",
     "close": "閉じる",
     "hide": "隠す",
@@ -91,6 +100,15 @@
     "sendMarks": "結果を送る（{parts}）"
   },
   "en": {
+    "deleteRow": "🗑 Delete this row",
+    "deleteItem": "🗑 Delete this item",
+    "deleteHeading": "🗑 Delete this heading",
+    "deletePara": "🗑 Delete this paragraph",
+    "deletedTag": "Deleted · Undo",
+    "deleteLine": "Delete",
+    "statDeletes": "deletions: {d}",
+    "sendStats": "Send your changes ({parts})",
+
     "startIdle": "✎ Fix wording",
     "close": "Close",
     "hide": "Hide",
@@ -354,6 +372,38 @@
     if (hint.length > 30) hint = hint.slice(0, 30) + "…";
     items.push({ node: node, original: original, index: counts[original], heading: hint, svg: svg, part: part, kind: kind, raw: svg ? node.textContent : "" });
   });
+  // Snapshot blocks before saved edits are applied, so matching and reports use source text.
+  var blocks = [];
+  items.forEach(function (it) {
+    if (it.svg) return;
+    var node = it.node.closest("tr, li, dt, dd, p, h1, h2, h3, h4, h5, h6, blockquote, figcaption, caption");
+    if (!node && /^(block|list-item|table|flex|grid|flow-root)$/.test(getComputedStyle(it.node).display)) node = it.node;
+    if (!node || node === document.body || node.closest(SKIP)) return;
+    var block = blocks.filter(function (b) { return b.node === node; })[0];
+    if (!block) {
+      block = { node: node, items: [], heading: it.heading, kind: node.localName === "tr" ? "row" : /^(li|dt|dd)$/.test(node.localName) ? "item" : /^h[1-6]$/.test(node.localName) ? "heading" : "para" };
+      blocks.push(block);
+    }
+    block.items.push(it); it.block = block;
+  });
+  blocks.forEach(function (b) {
+    b.original = b.items.map(function (it) { return it.original; }).join(t("lineSeparator"));
+  });
+  blocks.forEach(function (b) {
+    var same = blocks.filter(function (x) { return x.node.localName === b.node.localName && x.original === b.original; });
+    b.index = same.indexOf(b) + 1; b.total = same.length;
+    b.deleted = savedList("deletes").some(function (e) { return e && e.t === b.node.localName && e.o === b.original && e.i === b.index && e.n === b.total; });
+    if (b.deleted) b.node.setAttribute("data-fixwords-deleted", "");
+  });
+  function suppressed(it) { return !!it.node.closest("[data-fixwords-deleted]"); }
+  function deletions() { return blocks.filter(function (b) { return b.deleted; }); }
+  function inOrder(a, b) { return a.node.compareDocumentPosition(b.node) & 2 ? 1 : -1; }
+  function changeRows() { return changes().concat(deletions()).sort(inOrder); }
+  function setDeleted(b, on) {
+    b.deleted = on;
+    if (on) b.node.setAttribute("data-fixwords-deleted", ""); else b.node.removeAttribute("data-fixwords-deleted");
+    syncEditable();
+  }
   // A note is a plain string per element (it.note) plus one page-level note.
   var pageNote = "";
   function cleanNote(value) {
@@ -390,21 +440,22 @@
     if (n && typeof n === "object" && n.o === undefined && cleanNote(n.c)) { pageNote = cleanNote(n.c); return true; }
     return false;
   });
-  function noted() { return items.filter(function (it) { return it.note; }); }
+  function noted() { return items.filter(function (it) { return it.note && !suppressed(it); }); }
   function noteCount() { return noted().length + (pageNote ? 1 : 0); }
-  function total() { return changes().length + noteCount() + markCount(); }
+  function total() { return changes().length + deletions().length + noteCount() + markCount(); }
   function changes() {
-    return items.filter(function (it) { return text(it.node) !== it.original; });
+    return items.filter(function (it) { return !suppressed(it) && text(it.node) !== it.original; });
   }
   function persist() {
-    var changed = changes();
+    var changed = items.filter(function (it) { return text(it.node) !== it.original; });
     var map = { v: 1, closed: closed, edits: changed.map(function (it) {
       var edit = { o: it.original, i: it.index, n: it.total, t: text(it.node) };
       if (it.svg) edit.s = 1;
       if (it.part) edit.w = 1;
       return edit;
     }) };
-    var notes = noted().map(function (it) {
+    map.deletes = deletions().map(function (b) { return { t: b.node.localName, o: b.original, i: b.index, n: b.total }; });
+    var notes = items.filter(function (it) { return it.note; }).map(function (it) {
       var n = { o: it.original, i: it.index, n: it.total, c: it.note };
       if (it.svg) n.s = 1;
       if (it.part) n.w = 1;
@@ -439,7 +490,11 @@
         heading: it.heading ? t("heading", { heading: it.heading }) : "" }) : "";
     }
     var number = 0;
-    changes().forEach(function (it) {
+    changeRows().forEach(function (it) {
+      if (it.deleted) {
+        lines.push("", ++number + ". " + t("deleteLine") + hint(it) + t("separator") + oneLine(it.original));
+        return;
+      }
       var label = (it.svg ? t("figure") : "") + t("before") + hint(it);
       lines.push("", ++number + ". " + label + t("separator") + oneLine(it.original), t("after", { text: oneLine(text(it.node)) }));
     });
@@ -507,6 +562,12 @@
     "@media(pointer:coarse){.fixwords-marks button[role=radio]{min-height:44px;min-width:56px}}" +
     "@media print{.fixwords-box,.fixwords-note-pin,#fixwords-tools,#fixwords-svg-input,#fixwords-note-input{display:none!important}}" +
     "@media(prefers-reduced-motion:reduce){#fixwords-bar,#fixwords-panel,#fixwords-bar button,#fixwords-panel button,#fixwords-handle,#fixwords-status{transition:none}}";
+  css.textContent +=
+    "[data-fixwords-deleted]{background:rgba(180,35,24,.08)!important;text-decoration:line-through;color:#727780}[data-fixwords-deleted] [data-fixwords-changed],[data-fixwords-deleted] [data-fixwords-noted]{background:transparent!important;box-shadow:none!important;outline:none!important;text-decoration:line-through;color:inherit}" +
+    ".fixwords-deleted-tag{position:absolute;z-index:2147482998;min-height:32px;padding:4px 8px;border:1px solid #b42318;border-radius:8px;background:#fff1f0;color:#b42318;font:500 14px/1.5 sans-serif;cursor:pointer;touch-action:manipulation}.fixwords-deleted-tag:focus-visible{outline:3px solid #b42318;outline-offset:2px}" +
+    "#fixwords-tools{max-width:calc(100vw - 16px);flex-wrap:wrap;--danger:#b42318}#fixwords-tools #fixwords-delete{color:var(--danger)}#fixwords-tools button[hidden]{display:none!important}" +
+    "@media(prefers-color-scheme:dark){[data-fixwords-deleted]{background:rgba(249,112,102,.12)!important;color:#a5abb3}.fixwords-deleted-tag{background:#382321;color:#f97066;border-color:#f97066}#fixwords-tools{--danger:#f97066}}" +
+    "@media print{.fixwords-deleted-tag{display:none!important}}";
   document.head.appendChild(css);
   function element(tag, id, parent, label) {
     var node = document.createElement(tag); if (id) node.id = "fixwords-" + id;
@@ -535,6 +596,7 @@
   var tools = element("div", "tools", document.body); tools.hidden = true;
   tools.setAttribute("role", "toolbar"); tools.setAttribute("aria-label", t("toolsLabel"));
   var commentTool = button(t("comment"), tools);
+  var deleteTool = button("", tools, "delete"); deleteTool.hidden = true;
   var handle = button(t("iconEdit"), document.body, "handle");
   var badge = element("span", "badge", handle); badge.setAttribute("aria-hidden", "true");
   var panel = element("div", "panel", document.body); panel.hidden = true;
@@ -585,7 +647,7 @@
     panel.style.scrollPaddingTop = listView.hidden ? "" : listTop.offsetHeight + "px";
   }
   function render() {
-    var e = changes().length, m = noteCount(), k = markCount(), n = e + m, all = n + k, pending = all && unsent(), idle = !editing && !all;
+    var e = changes().length, d = deletions().length, m = noteCount(), k = markCount(), n = e + d + m, all = n + k, pending = all && unsent(), idle = !editing && !all;
     bar.hidden = closed || tucked; handle.hidden = !bar.hidden; hide.hidden = idle;
     if (idle) bar.setAttribute("data-idle", ""); else bar.removeAttribute("data-idle");
     start.hidden = !idle; status.hidden = idle;
@@ -593,14 +655,15 @@
     pageBtn.hidden = idle; if (pageNote) pageBtn.setAttribute("data-noted", ""); else pageBtn.removeAttribute("data-noted");
     toggle.textContent = editing ? t("stop") : t("continue");
     toggle.setAttribute("aria-pressed", editing ? "true" : "false");
-    if (choices.length) {
-      var v = { k: k, all: markIds.length, n: e, m: m };
-      var stats = [t("statMarks", v)];
+    if (choices.length || d) {
+      var v = { k: k, all: markIds.length, n: e, d: d, m: m };
+      var stats = choices.length ? [t("statMarks", v)] : [];
       if (e) stats.push(t("statEdits", v));
+      if (d) stats.push(t("statDeletes", v));
       if (m) stats.push(t("statNotes", v));
       stats = stats.join(t("statJoin"));
       status.textContent = !all ? t("empty") : stats + t(pending ? "tailPending" : sentMode === "shared" ? "tailShared" : "tailCopied");
-      send.textContent = t("sendMarks", { parts: stats });
+      send.textContent = t(choices.length ? "sendMarks" : "sendStats", { parts: stats });
     } else {
       var sentKey = (sentMode === "shared" ? "sharedStatus" : "copiedStatus") + (m ? "Notes" : "");
       status.textContent = !n ? t("empty") : pending ? t(m ? "pendingNotes" : "pending", { n: e, m: m }) : t(sentKey, { n: e, m: m });
@@ -648,9 +711,10 @@
   // A 💬 pin just after the last character of each commented text opens its comment, in any mode.
   // It lives in the body, not in the page text, so the text and the report stay as they are.
   function placePins() {
+    placeDeletedTags();
     // Three passes, so a page with many comments lays out once: DOM writes, then all reads, then the positions.
     var pinned = items.filter(function (it) {
-      if (!it.note || closed) { if (it.pin) { it.pin.remove(); it.pin = null; } return false; }
+      if (!it.note || closed || suppressed(it)) { if (it.pin) { it.pin.remove(); it.pin = null; } return false; }
       if (!it.pin) {
         it.pin = button("💬", document.body); it.pin.className = "fixwords-note-pin";
         it.pin.addEventListener("click", function () { openNote({ item: it }); });
@@ -679,6 +743,22 @@
     });
   }
 
+  function placeDeletedTags() {
+    blocks.forEach(function (b) {
+      if (!b.deleted || closed) { if (b.tag) { b.tag.remove(); b.tag = null; } return; }
+      if (!b.tag) {
+        b.tag = button(t("deletedTag"), document.body); b.tag.className = "fixwords-deleted-tag";
+        b.tag.addEventListener("click", function () {
+          setDeleted(b, false); persist(); mark();
+          if (editing) b.items[0].node.focus(); else (start.hidden ? toggle : start).focus();
+        });
+      }
+      b.tag.style.left = b.tag.style.top = "0px";
+      var zero = b.tag.getBoundingClientRect(), r = b.node.getBoundingClientRect();
+      b.tag.style.left = Math.max(0, Math.min(r.left, document.documentElement.clientWidth - zero.width)) - zero.left + "px";
+      b.tag.style.top = r.top - zero.height / 2 - zero.top + "px";
+    });
+  }
   var svgInput = null, svgItem = null;
   // Safari ends the composition before the Enter that confirmed it; that keydown carries keyCode 229.
   function composing(e) { return e.isComposing || e.keyCode === 229; }
@@ -797,9 +877,12 @@
   function updateTools() {
     if (!toolItem || tools.hidden) return;
     commentTool.textContent = t(toolItem.note ? "commentEdit" : "comment");
+    deleteTool.hidden = !toolItem.block;
+    if (toolItem.block) deleteTool.textContent = t("delete" + toolItem.block.kind.charAt(0).toUpperCase() + toolItem.block.kind.slice(1));
     placeTools();
   }
   function showTools(it) {
+    if (suppressed(it)) return hideTools();
     toolItem = it; tools.hidden = false;
     updateTools();
   }
@@ -811,6 +894,12 @@
     if (svgInput && svgItem === it) finishSvg(false, false);
     openNote({ item: it });
   });
+  deleteTool.addEventListener("click", function () {
+    if (!toolItem || !toolItem.block) return;
+    var b = toolItem.block;
+    finishNote(false, false); hideTools(); setDeleted(b, true); hideSheet(); persist(); mark();
+    if (b.tag) b.tag.focus();
+  });
   function backToText() { (svgInput && svgItem === toolItem ? svgInput : toolItem.node).focus(); }
   tools.addEventListener("keydown", function (e) {
     if (!toolItem || composing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -819,7 +908,7 @@
     else if (e.key === "Tab" && e.shiftKey && e.target === buttons[0]) { e.preventDefault(); backToText(); }
     else if (e.key === "Tab" && !e.shiftKey && e.target === buttons[buttons.length - 1]) {
       e.preventDefault();
-      var next = items[items.indexOf(toolItem) + 1];
+      var next = items.slice(items.indexOf(toolItem) + 1).filter(function (it) { return !suppressed(it); })[0];
       (next ? next.node : send).focus();
     }
   });
@@ -850,20 +939,31 @@
     if (!on) { finishSvg(false, false); finishNote(false, false); hideTools(); }
     editing = on;
     document.body.classList.toggle("fixwords-editing", on);
+    syncEditable();
+    mark(); render();
+  }
+  function syncEditable() {
+    var on = editing;
     items.forEach(function (it) {
+      if (suppressed(it)) {
+        if (!it.deletedAttrs) it.deletedAttrs = { tabindex: it.node.getAttribute("tabindex") };
+        it.node.removeAttribute("tabindex");
+      } else if (it.deletedAttrs) {
+        if (it.deletedAttrs.tabindex != null) it.node.setAttribute("tabindex", it.deletedAttrs.tabindex);
+        it.deletedAttrs = null;
+      }
       // SVG labels are not contenteditable; they open the floating input instead.
       var attrs = it.svg ? { tabindex: "0", role: "button" } : { contenteditable: "plaintext-only" };
       attrs["data-fixwords-editable"] = "";
       // The page's own tabindex and role on a label come back when editing ends.
-      if (on && it.svg) it.own = { tabindex: it.node.getAttribute("tabindex"), role: it.node.getAttribute("role") };
+      if (on && it.svg && !it.own) it.own = { tabindex: it.node.getAttribute("tabindex"), role: it.node.getAttribute("role") };
       if (!on && it.svg && !it.own) return;
       Object.keys(attrs).forEach(function (name) {
-        if (on) it.node.setAttribute(name, attrs[name]);
+        if (on && !suppressed(it)) it.node.setAttribute(name, attrs[name]);
         else if (it.own && it.own[name] != null) it.node.setAttribute(name, it.own[name]);
         else it.node.removeAttribute(name);
       });
     });
-    mark(); render();
   }
   function locationLabel(it) {
     var parts = [];
@@ -885,7 +985,7 @@
   // focusAt: the row whose button takes focus (the next one after a revert); none on opening.
   function rebuildList(focusAt) {
     rows.textContent = "";
-    var changed = changes(), buttons = [];
+    var changed = changeRows(), buttons = [];
     resetAll.hidden = !total();
     listDone.hidden = !!changed.length;
     // With no rows left, the question has nothing to choose from.
@@ -896,18 +996,21 @@
       if (loc) element("div", "", row, loc).className = "fixwords-location";
       element("span", "", row, t("was")).className = "fixwords-sr";
       element("del", "", row, oneLine(it.original)).className = "fixwords-text";
-      var current = oneLine(text(it.node));
-      element("span", "", row, t("now")).className = "fixwords-sr";
-      element("div", "", row, current || t("emptied")).className = "fixwords-text";
+      var current = it.deleted ? "" : oneLine(text(it.node));
+      if (!it.deleted) {
+        element("span", "", row, t("now")).className = "fixwords-sr";
+        element("div", "", row, current || t("emptied")).className = "fixwords-text";
+      }
       var revert = button(t("rowUndo"), row);
-      revert.setAttribute("aria-label", t(current ? "rowLabel" : "rowLabelEmpty", {
+      revert.setAttribute("aria-label", t(it.deleted || current ? "rowLabel" : "rowLabelEmpty", {
         text: cut(current || oneLine(it.original), 20), where: loc ? t("whereWrap", { where: loc }) : "" }));
       revert.addEventListener("click", function () {
         // The next row moves under the pointer: a double click must not revert it too.
         if (Date.now() - revertedAt < 500) return;
         revertedAt = Date.now();
-        setUndo({ item: it, text: text(it.node) });
-        writeBack(it, it.original); persist(); mark(); rebuildList(i);
+        setUndo({ item: it, text: text(it.node), deleted: !!it.deleted });
+        if (it.deleted) setDeleted(it, false); else writeBack(it, it.original);
+        persist(); mark(); rebuildList(i);
       });
       buttons.push(revert);
     });
@@ -920,8 +1023,9 @@
   undo.addEventListener("click", function () {
     var slot = undoSlot;
     if (!slot) return;
-    revertedAt = 0; setUndo(null); writeBack(slot.item, slot.text);
-    persist(); mark(); rebuildList(changes().indexOf(slot.item));
+    revertedAt = 0; setUndo(null);
+    if (slot.deleted) setDeleted(slot.item, true); else writeBack(slot.item, slot.text);
+    persist(); mark(); rebuildList(changeRows().indexOf(slot.item));
   });
   function hideSheet(restoreFocus) {
     var wasOpen = !panel.hidden, wasList = !listView.hidden;
@@ -940,7 +1044,7 @@
   }
   function showSheet(value) {
     sheetText = value; area.value = value; openPanel(sendView, t("sendLabel"));
-    var changed = changes();
+    var changed = changeRows();
     if (changed.length) changed[0].node.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
   }
   // A share or copy can settle after the user edited again or folded the bar; its sheet must not open then.
@@ -1047,6 +1151,7 @@
   resetAll.addEventListener("click", function () {
     if (!total() || !window.confirm(t(choices.length ? "confirmMarks" : "confirm"))) return;
     items.forEach(function (it) { writeBack(it, it.original); it.note = ""; });
+    blocks.forEach(function (b) { setDeleted(b, false); });
     pageNote = ""; marks = Object.create(null); paintMarks();
     sent = ""; hideSheet(true); persist(); mark();
   });

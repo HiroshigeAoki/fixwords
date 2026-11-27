@@ -641,6 +641,8 @@ for (const lang of ['en', 'ja']) {
       await p.keyboard.press('Tab');
       assert.equal(await p.evaluate(() => document.activeElement.parentNode.id), 'fixwords-tools');
       await p.keyboard.press('Tab');
+      assert.equal(await p.evaluate(() => document.activeElement.id), 'fixwords-delete');
+      await p.keyboard.press('Tab');
       assert.equal(await p.evaluate(() => document.activeElement.id), 'dup2');
       await p.keyboard.press('Tab'); await p.keyboard.press('Enter');
       await p.locator('#fixwords-note-input').dispatchEvent('keydown', {key:'Escape', isComposing:true, bubbles:true});
@@ -661,15 +663,15 @@ test('toolbar: label follows the note, SVG label shows it beside the input, ends
   assert.equal(await tools.isVisible(), false);
   await start(p);
   await p.locator('#dup1').focus();
-  assert.equal(await tools.locator('button').textContent(), '💬 Comment');
+  assert.equal(await tools.locator('button').first().textContent(), '💬 Comment');
   await p.keyboard.press('Tab'); await p.keyboard.press('Enter');
   await p.locator('#fixwords-note-input').fill('Why?'); await p.keyboard.press('Control+Enter');
   assert.equal(await p.evaluate(() => document.activeElement.id), 'dup1');
-  assert.equal(await tools.locator('button').textContent(), '💬 Edit comment');
+  assert.equal(await tools.locator('button').first().textContent(), '💬 Edit comment');
   // The label field gets the toolbar with the comment button only, above the input.
   await p.locator('#label').click();
   const input = await p.locator('#fixwords-svg-input').boundingBox(), box = await tools.boundingBox();
-  assert.equal(await tools.locator('button').count(), 1);
+  assert.equal(await tools.locator('button:visible').count(), 1);
   assert.ok(box.y + box.height <= input.y + 1);
   await p.keyboard.press('Escape');
   assert.equal(await tools.isVisible(), false);
@@ -1133,6 +1135,77 @@ test('marks: an id that is an Object.prototype name survives a reload', async ()
   // The fixture's own meta offers OK, NG and 例外.
   assert.equal(await checked(p, 'm2'), 'false,true,false');
   await done(p);
+});
+
+async function deleteBlock(p, selector) {
+  await p.locator(selector).focus();
+  await p.locator('#fixwords-delete').click();
+}
+async function blockReport(p) {
+  await p.locator('#fixwords-send').click();
+  await p.locator('#fixwords-panel').waitFor();
+  const value = await p.locator('#fixwords-panel textarea').inputValue();
+  await p.locator('#fixwords-panel').getByRole('button', { name: /^(Close|閉じる)$/ }).click();
+  return value;
+}
+test('deletions: row from cell, original text, focus, suppressed edits and notes survive reload and undo', async () => {
+  const p = await open('blocks'); await start(p);
+  await edit(p, '#cell1', 'Edited');
+  await openComment(p, '#cell2');
+  await p.locator('#fixwords-note-input').fill('Question?'); await p.keyboard.press('Control+Enter');
+  await deleteBlock(p, '#cell1');
+  assert.equal(await p.locator('#row').getAttribute('data-fixwords-deleted'), '');
+  assert.equal(await p.locator('#row [contenteditable], #row [tabindex]').count(), 0);
+  assert.equal(await p.locator('.fixwords-deleted-tag').evaluate(n => n === document.activeElement), true);
+  assert.equal(await p.locator('.fixwords-note-pin').count(), 0);
+  let value = await blockReport(p);
+  assert.match(value, /1\. 削除：One ／ Two/); assert.doesNotMatch(value, /新：|Question/);
+  await p.reload(); await start(p);
+  await p.locator('.fixwords-deleted-tag').click();
+  assert.equal(await p.locator('#cell1').textContent(), 'Edited');
+  value = await blockReport(p); assert.match(value, /新：Edited/); assert.match(value, /Question/);
+  await done(p);
+});
+test('deletions: paragraph occurrence, heading, list item, fallback block, document order and undo list', async () => {
+  const p = await open('blocks'); await start(p);
+  await deleteBlock(p, '#para2'); await deleteBlock(p, '#item > span:first-child');
+  await p.locator('#item .fixwords-marks button').first().click();
+  assert.equal(await p.locator('#item .fixwords-marks button').first().getAttribute('aria-checked'), 'true');
+  await deleteBlock(p, '#heading'); await deleteBlock(p, '#plain');
+  const value = await blockReport(p);
+  assert.match(value, /1\. 削除：Section/);
+  assert.match(value, /2\. 削除（2か所目／全2か所・見出し「Section」の下）：Repeated/);
+  assert.match(value, /3\. 削除：List text/); assert.match(value, /4\. 削除：Plain block/);
+  await p.locator('#fixwords-reset').click();
+  assert.equal(await p.locator('.fixwords-row').count(), 4);
+  await p.locator('.fixwords-row button').first().click();
+  assert.equal(await p.locator('#heading').getAttribute('data-fixwords-deleted'), null);
+  await p.locator('#fixwords-undo').click();
+  assert.equal(await p.locator('#heading').getAttribute('data-fixwords-deleted'), '');
+  p.once('dialog', d => d.accept()); await p.locator('#fixwords-reset-all').click();
+  assert.equal(await p.locator('[data-fixwords-deleted], .fixwords-deleted-tag').count(), 0);
+  await done(p);
+});
+test('deletions: localized counts, toolbar geometry and SVG exclusion', async () => {
+  for (const lang of ['ja', 'en']) for (const width of [390, 1280]) for (const colorScheme of ['light', 'dark']) {
+    const p = await open('blocks', { viewport: { width, height: 900 }, colorScheme });
+    await p.route('**/localized.html', r => r.fulfill({ contentType: 'text/html', body:
+      require('node:fs').readFileSync('tests/fixtures/blocks.html', 'utf8').replace('lang="ja"', 'lang="' + lang + '"').replace('{"marks":["OK","NG"]}', '{}') }));
+    await p.goto(env.base + '/localized.html'); await start(p);
+    await edit(p, '#para1', 'Changed'); await deleteBlock(p, '#cell1');
+    assert.equal(await p.locator('#fixwords-send').textContent(), lang === 'ja' ? '直した内容を送る（直し 1 か所・削除 1 か所）' : 'Send your changes (changes: 1, deletions: 1)');
+    assert.match(await p.locator('#fixwords-status').textContent(), lang === 'ja' ? /直し 1 か所・削除 1 か所/ : /changes: 1, deletions: 1/);
+    await p.locator('#para2').focus();
+    const box = await p.locator('#fixwords-tools').boundingBox(), bar = await p.locator('#fixwords-bar').boundingBox();
+    assert.ok(box.x >= 7 && box.x + box.width <= width - 7 && box.y >= 7 && box.y + box.height < bar.y);
+    await p.locator('#svg').click(); assert.equal(await p.locator('#fixwords-delete').isVisible(), false);
+    await done(p);
+  }
+});
+test('deletions: old saved edits without deletes still load', async () => {
+  const p = await open('en', {}, () => localStorage.setItem('fixwords:/en.html', JSON.stringify({ v: 1, edits: [{ o: 'Baked daily', i: 2, n: 2, t: 'Old edit' }] })));
+  assert.equal(await p.locator('#dup2').textContent(), 'Old edit');
+  assert.equal(await p.locator('[data-fixwords-deleted]').count(), 0); await done(p);
 });
 
 });

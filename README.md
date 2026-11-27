@@ -47,14 +47,17 @@ Working with a coding agent? Ask it:
 2. Tap any text and rewrite it. Changed text is highlighted.
    If the panel covers the text, press **Hide**: editing goes on and only the ✎ button stays in the corner. Tap ✎ to
    bring the panel back.
-3. To ask a question or leave a remark instead of rewriting, press **💬 Comment**, tap the text and write it
+3. Tap the text to show its toolbar. To ask a question or leave a remark, press **💬 Comment** and write it
    (Ctrl/Cmd+Enter or tapping elsewhere saves). **Comment on the whole page** adds a note that belongs to no text.
-   Press **✓ Finish commenting** or Esc to leave comment mode. Commented text gets a dotted underline and a 💬 button
+   Commented text gets a dotted underline and a 💬 button
    after its last character, which opens the comment again at any time.
-4. To take back a change, press **Reset changes**. It opens a list of the changed texts; **Undo** on a row reverts
+   The toolbar's **🗑 Delete this row/item/heading/paragraph** marks a whole block for deletion.
+   Press its **Deleted · Undo** tag to restore it. Figure labels offer comments only.
+4. To take back a change, press **Reset changes**. It opens a list of changed texts and deletions, with each deleted
+   block shown as one item; **Undo** on a row reverts
    just that text, and **Restore** in the notice brings the last one back until the list is closed. Once no
    changed text is left, the list title goes away and a **Close** button
-   appears. **Undo all** reverts every change and deletes every comment after a confirmation. To remove a
+   appears. **Undo all** reverts every change, restores deleted blocks and deletes every comment after a confirmation. To remove a
    comment, empty its box.
 5. Press **Send your changes**. On a touch device (phone, tablet) the share sheet opens; on a computer the list
    is copied to the clipboard. Paste it into a chat or an email to the author.
