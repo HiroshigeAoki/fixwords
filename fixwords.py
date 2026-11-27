@@ -259,6 +259,9 @@ def parse_report(text):
             if label.startswith(prefix):
                 item['figure'] = True
                 label = label[len(prefix):]
+        # Block deletions are single-line feedback, outside the wording learner.
+        if re.match(rf'^(?:削除(?:{JA_HINT})?：|Delete(?:{EN_HINT})?: )', label):
+            continue
         if index >= len(body):
             raise ValueError(f'unparseable item {number}')
         value = body[index]
