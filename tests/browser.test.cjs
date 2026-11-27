@@ -1208,4 +1208,86 @@ test('deletions: old saved edits without deletes still load', async () => {
   assert.equal(await p.locator('[data-fixwords-deleted]').count(), 0); await done(p);
 });
 
+async function openNested(p, body) {
+  await p.route('**/nested.html', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body:
+    '<html lang="en"><title>Nested</title><body>' + body + '<script src="/fixwords.js"></script></body></html>' }));
+  await p.goto(env.base + '/nested.html');
+}
+for (const kind of ['list', 'table']) {
+  test('deletions: nested ' + kind + ' originals, counts and child state survive outer undo and reload', async () => {
+    const p = await open();
+    await openNested(p, kind === 'list'
+      ? '<ul><li><span id="parent">Parent</span><ul><li id="child">Child</li></ul><span>Tail</span></li></ul>'
+      : '<table><tr><td id="parent">Parent</td><td><table><tr><td id="child">Child</td></tr></table></td><td>Tail</td></tr></table>');
+    await start(p);
+    await edit(p, '#child', 'Changed child');
+    await note(p, '#child', 'Child question');
+    // An outer deletion alone suppresses the child's edit and note, using source originals.
+    await deleteBlock(p, '#parent');
+    let report = await blockReport(p);
+    assert.match(report, /1\. Delete: Parent \/ Child \/ Tail/);
+    assert.doesNotMatch(report, /After:|Child question/);
+    await p.locator('.fixwords-deleted-tag').click();
+    report = await blockReport(p);
+    assert.match(report, /After: Changed child/);
+    assert.match(report, /Child question/);
+    await deleteBlock(p, '#child');
+    await deleteBlock(p, '#parent');
+    assert.equal(await p.locator('#fixwords-send').textContent(), 'Send your changes (deletions: 1)');
+    assert.equal(await p.locator('.fixwords-deleted-tag').count(), 1);
+    report = await blockReport(p);
+    assert.match(report, /1\. Delete: Parent \/ Child \/ Tail/);
+    assert.doesNotMatch(report, /2\.|Changed child|Child question/);
+    await p.reload(); await start(p);
+    await p.locator('.fixwords-deleted-tag').click();
+    assert.equal(await p.locator('#child').getAttribute('contenteditable'), null);
+    assert.match(await blockReport(p), /1\. Delete: Child/);
+    await p.locator('.fixwords-deleted-tag').click();
+    report = await blockReport(p);
+    assert.match(report, /After: Changed child/);
+    assert.match(report, /Child question/);
+    await done(p);
+  });
+}
+test('toolbar: click and tap on non-focusable text hide it; toolbar and note retain focus access', async () => {
+  for (const touch of [false, true]) {
+    const p = await open('en', { hasTouch: touch });
+    await start(p);
+    await p.locator('#dup1').focus();
+    await p.keyboard.press('Tab');
+    assert.equal(await p.locator('#fixwords-tools').isVisible(), true);
+    await p.keyboard.press('Escape');
+    await p.locator('#fixwords-tools button').first().click();
+    assert.equal(await p.locator('#fixwords-note-input').isVisible(), true);
+    await p.keyboard.press('Escape');
+    // A newly inserted static node is deliberately outside the boot-time editable items.
+    await p.evaluate(() => {
+      const text = document.createElement('div'); text.id = 'static-text'; text.textContent = 'Static text';
+      text.style.cssText = 'position:fixed;top:250px;left:10px'; document.body.append(text);
+    });
+    await p.locator('#dup1').focus();
+    if (touch) await p.locator('#static-text').tap(); else await p.locator('#static-text').click();
+    assert.equal(await p.evaluate(() => document.activeElement === document.body), true);
+    await p.waitForFunction(() => document.querySelector('#fixwords-tools').hidden);
+    await done(p);
+  }
+});
+test('deletions: suppressed SVG boxes disappear and own tabindex survives saved deletion and restore', async () => {
+  const p = await open();
+  await openNested(p, '<ul><li><span id="parent">Parent</span><svg width="100" height="40"><text id="label" tabindex="-1" role="note" x="0" y="20">Label</text></svg></li></ul>');
+  await start(p);
+  assert.equal(await p.locator('.fixwords-box').count(), 1);
+  await deleteBlock(p, '#parent');
+  assert.equal(await p.locator('.fixwords-box').count(), 0);
+  assert.equal(await p.locator('#label').getAttribute('tabindex'), null);
+  await p.reload(); await start(p);
+  assert.equal(await p.locator('.fixwords-box').count(), 0);
+  await p.locator('.fixwords-deleted-tag').click();
+  assert.equal(await p.locator('.fixwords-box').count(), 1);
+  await p.getByRole('button', { name: 'Finish editing', exact: true }).click();
+  assert.equal(await p.locator('#label').getAttribute('tabindex'), '-1');
+  assert.equal(await p.locator('#label').getAttribute('role'), 'note');
+  await done(p);
+});
+
 });

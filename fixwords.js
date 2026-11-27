@@ -387,7 +387,8 @@
     block.items.push(it); it.block = block;
   });
   blocks.forEach(function (b) {
-    b.original = b.items.map(function (it) { return it.original; }).join(t("lineSeparator"));
+    b.original = items.filter(function (it) { return b.node.contains(it.node); })
+      .map(function (it) { return it.original; }).join(t("lineSeparator"));
   });
   blocks.forEach(function (b) {
     var same = blocks.filter(function (x) { return x.node.localName === b.node.localName && x.original === b.original; });
@@ -396,8 +397,9 @@
     if (b.deleted) b.node.setAttribute("data-fixwords-deleted", "");
   });
   function suppressed(it) { return !!it.node.closest("[data-fixwords-deleted]"); }
-  function deletions() { return blocks.filter(function (b) { return b.deleted; }); }
-  function inOrder(a, b) { return a.node.compareDocumentPosition(b.node) & 2 ? 1 : -1; }
+  function covered(b) { return !!b.node.parentElement.closest("[data-fixwords-deleted]"); }
+  function deletions() { return blocks.filter(function (b) { return b.deleted && !covered(b); }); }
+  function inOrder(a, b) { return a.node === b.node ? 0 : a.node.compareDocumentPosition(b.node) & 2 ? 1 : -1; }
   function changeRows() { return changes().concat(deletions()).sort(inOrder); }
   function setDeleted(b, on) {
     b.deleted = on;
@@ -454,7 +456,8 @@
       if (it.part) edit.w = 1;
       return edit;
     }) };
-    map.deletes = deletions().map(function (b) { return { t: b.node.localName, o: b.original, i: b.index, n: b.total }; });
+    // Keep covered child deletions too, so restoring their ancestor revives their state.
+    map.deletes = blocks.filter(function (b) { return b.deleted; }).map(function (b) { return { t: b.node.localName, o: b.original, i: b.index, n: b.total }; });
     var notes = items.filter(function (it) { return it.note; }).map(function (it) {
       var n = { o: it.original, i: it.index, n: it.total, c: it.note };
       if (it.svg) n.s = 1;
@@ -680,7 +683,7 @@
   // because its size follows the label's current text and layout.
   function markSvg(it, changed, noted) {
     if (it.box) { it.box.remove(); it.box = null; }
-    if (!editing && !changed && !noted) return;
+    if (suppressed(it) || (!editing && !changed && !noted)) return;
     try {
       var b = it.node.getBBox();
       var anchor = it.node.localName === "text" ? it.node : it.node.closest("text");
@@ -745,7 +748,7 @@
 
   function placeDeletedTags() {
     var tagged = blocks.filter(function (b) {
-      if (!b.deleted || closed) { if (b.tag) { b.tag.remove(); b.tag = null; } return false; }
+      if (!b.deleted || covered(b) || closed) { if (b.tag) { b.tag.remove(); b.tag = null; } return false; }
       if (!b.tag) {
         b.tag = button(t("deletedTag"), document.body); b.tag.className = "fixwords-deleted-tag";
         b.tag.addEventListener("click", function () {
@@ -924,6 +927,18 @@
     // Leaving the toolbar for anything but the label's field ends the label edit.
     if (svgInput && e.relatedTarget !== svgInput && !(e.relatedTarget && tools.contains(e.relatedTarget))) finishSvg(false, false);
   });
+  document.addEventListener("focusout", function (e) {
+    // Static page text can leave focus on body without dispatching focusin. When focus moves to another element,
+    // focusin handles it; activeElement is still body in a microtask here, so wait a task before checking.
+    if (e.relatedTarget) return;
+    setTimeout(function () {
+      if (!toolItem) return;
+      var el = document.activeElement;
+      if (el === toolNode() || tools.contains(el)) return;
+      if (noteInput && el === noteInput && noteTarget.item === toolItem) return;
+      hideTools();
+    });
+  });
   document.addEventListener("focusin", function (e) {
     var el = e.target;
     if (!editing || !panel.hidden) { hideTools(); return; }
@@ -953,6 +968,8 @@
   function syncEditable() {
     var on = editing;
     items.forEach(function (it) {
+      // Capture the page's attributes before a saved deletion can strip them, even before editing.
+      if (it.svg && !it.own) it.own = { tabindex: it.node.getAttribute("tabindex"), role: it.node.getAttribute("role") };
       var deleted = suppressed(it);
       if (deleted) {
         if (!it.deletedAttrs) it.deletedAttrs = { tabindex: it.node.getAttribute("tabindex") };
@@ -965,11 +982,9 @@
       var attrs = it.svg ? { tabindex: "0", role: "button" } : { contenteditable: "plaintext-only" };
       attrs["data-fixwords-editable"] = "";
       // The page's own tabindex and role on a label come back when editing ends.
-      if (on && it.svg && !it.own) it.own = { tabindex: it.node.getAttribute("tabindex"), role: it.node.getAttribute("role") };
-      if (!on && it.svg && !it.own) return;
       Object.keys(attrs).forEach(function (name) {
         if (on && !deleted) it.node.setAttribute(name, attrs[name]);
-        else if (it.own && it.own[name] != null) it.node.setAttribute(name, it.own[name]);
+        else if (it.own && it.own[name] != null && !(deleted && name === "tabindex")) it.node.setAttribute(name, it.own[name]);
         else it.node.removeAttribute(name);
       });
     });
