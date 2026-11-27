@@ -1282,6 +1282,10 @@ test('deletions: suppressed SVG boxes disappear and own tabindex survives saved 
   assert.equal(await p.locator('#label').getAttribute('tabindex'), null);
   await p.reload(); await start(p);
   assert.equal(await p.locator('.fixwords-box').count(), 0);
+  // The deleted tag sits over the block's corner, so dispatch the click on the label itself.
+  await p.locator('#label').dispatchEvent('click');
+  await p.locator('#label').dispatchEvent('keydown', { key: 'Enter', bubbles: true });
+  assert.equal(await p.locator('#fixwords-svg-input').count(), 0);
   await p.locator('.fixwords-deleted-tag').click();
   assert.equal(await p.locator('.fixwords-box').count(), 1);
   await p.getByRole('button', { name: 'Finish editing', exact: true }).click();

@@ -863,9 +863,9 @@
   }
   items.forEach(function (it) {
     if (!it.svg) return;
-    it.node.addEventListener("click", function () { if (editing) openSvg(it); });
+    it.node.addEventListener("click", function () { if (editing && !suppressed(it)) openSvg(it); });
     it.node.addEventListener("keydown", function (e) {
-      if (editing && (e.key === " " || (e.key === "Enter" && !composing(e)))) { e.preventDefault(); openSvg(it); }
+      if (editing && !suppressed(it) && (e.key === " " || (e.key === "Enter" && !composing(e)))) { e.preventDefault(); openSvg(it); }
     });
   });
   // The toolbar floats just above the text being edited (below it when there is no room above) and never under the bar.
