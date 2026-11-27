@@ -993,6 +993,12 @@ test('marks: reasons also open during editing, while elements without editable t
   await verdicts(p, 'm1').nth(1).click();
   assert.equal(await p.locator('#fixwords-note-input').isVisible(), true);
   await p.keyboard.press('Escape');
+  // A deleted item takes a verdict but no reason: its text is out of the report.
+  await verdicts(p, 'm1').nth(0).click();
+  await deleteBlock(p, '#m1 > span:not(.fixwords-marks)');
+  await verdicts(p, 'm1').nth(1).dispatchEvent('click');
+  assert.equal(await verdicts(p, 'm1').nth(1).getAttribute('aria-checked'), 'true');
+  assert.equal(await p.locator('#fixwords-note-input').count(), 0);
   await done(p);
   const q = await openMarks({ marks: ['?'] });
   await q.route('**/empty-mark.html', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body:

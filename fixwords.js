@@ -521,7 +521,7 @@
     if (noteChoices.indexOf(choice) < 0) return;
     // Items are collected in document order; use the clicked element even for shared verdict ids.
     var it = items.filter(function (item) { return node.contains(item.node); })[0];
-    if (!it || it.note) return;
+    if (!it || it.note || suppressed(it)) return;
     if (!editing) setEditing(true);
     openNote({ item: it, choice: choice, returnFocus: button });
   }
