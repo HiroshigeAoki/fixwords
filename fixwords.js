@@ -5,7 +5,6 @@
   var STRINGS = {
   "ja": {
     "startIdle": "✎ 文言を直す",
-    "start": "文言を直す",
     "close": "閉じる",
     "hide": "隠す",
     "stepOne": "① 直したい文字をタップして書き換える",
@@ -51,8 +50,8 @@
     "iconEdit": "✎",
     "comment": "💬 コメント",
     "pageComment": "ページ全体へのコメント",
-    "commentDone": "✓ コメントを終える",
-    "commentHint": "💬 コメントしたい文字をタップしてください",
+    "commentEdit": "💬 コメントを直す",
+    "toolsLabel": "この文言のツール",
     "notePin": "コメントを開く：{text}",
     "noteLabel": "コメントを書く",
     "pendingNotes": "直し {n} か所・コメント {m} 件 ・ まだ送っていません",
@@ -93,7 +92,6 @@
   },
   "en": {
     "startIdle": "✎ Fix wording",
-    "start": "Fix wording",
     "close": "Close",
     "hide": "Hide",
     "stepOne": "1. Tap the words you want to change and rewrite them.",
@@ -139,8 +137,8 @@
     "iconEdit": "✎",
     "comment": "💬 Comment",
     "pageComment": "Comment on the whole page",
-    "commentDone": "✓ Finish commenting",
-    "commentHint": "💬 Tap the words you want to comment on",
+    "commentEdit": "💬 Edit comment",
+    "toolsLabel": "Tools for this text",
     "notePin": "Open comment: {text}",
     "noteLabel": "Write a comment",
     "pendingNotes": "Changes: {n}, comments: {m} · Not sent yet",
@@ -462,7 +460,7 @@
   var destination = typeof config.send_to === "string" ? config.send_to.replace(/\s+/g, " ").trim() : "";
   if (destination.length > 60) destination = destination.slice(0, 60) + "…";
   if (destination && !/[。.!?！？]$/.test(destination)) destination += t("destinationEnd");
-  var editing = false, commenting = false, busy = false, sheetText = "", sentMode = "copied";
+  var editing = false, busy = false, sheetText = "", sentMode = "copied";
   function hash(value) {
     var h = 5381;
     for (var i = 0; i < value.length; i++) h = ((h << 5) + h) ^ value.charCodeAt(i);
@@ -478,8 +476,8 @@
     "#fixwords-bar button:active,#fixwords-panel button:active,#fixwords-handle:active{transform:scale(.97)}" +
     "#fixwords-bar button:focus-visible,#fixwords-panel button:focus-visible,#fixwords-panel textarea:focus-visible,#fixwords-handle:focus-visible{outline:3px solid var(--accent);outline-offset:2px}" +
     "#fixwords-bar [hidden],#fixwords-panel [hidden],#fixwords-bar[hidden],#fixwords-panel[hidden],#fixwords-handle[hidden]{display:none!important}" +
-    "#fixwords-header,#fixwords-secondary,#fixwords-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}#fixwords-header{flex-wrap:nowrap}#fixwords-hide{margin-left:auto}#fixwords-title{font-weight:600}" +
-    "#fixwords-guide{margin:4px 0 12px}#fixwords-guide strong{display:block;margin-top:6px}#fixwords-status{color:var(--muted);margin:8px 0;transition:opacity 200ms cubic-bezier(.23,1,.32,1)}" +
+    "#fixwords-header,#fixwords-secondary,#fixwords-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}#fixwords-header{flex-wrap:nowrap}#fixwords-hide{margin-left:auto}#fixwords-title{font-weight:600}#fixwords-header #fixwords-status{flex:1;min-width:0;margin:0;overflow-wrap:anywhere}" +
+    "#fixwords-guide{margin:4px 0 12px}#fixwords-guide strong{display:block;margin-top:6px}#fixwords-status{color:var(--muted);margin:0;transition:opacity 200ms cubic-bezier(.23,1,.32,1)}" +
     "#fixwords-status[data-state=unsent]{color:var(--amber)}#fixwords-status[data-state=sent]{color:var(--accent)}#fixwords-status[data-state=unsent]:before{content:'● ';}#fixwords-status[data-state=sent]:before{content:'✓ ';}" +
     "#fixwords-bar #fixwords-send{width:100%;min-height:48px;background:var(--accent);color:var(--accent-ink);font-size:16px;font-weight:600}#fixwords-bar #fixwords-send[aria-disabled=true]{background:var(--edge);color:var(--muted)}" +
     "#fixwords-bar[data-idle]{width:auto;height:44px;padding:0;border-radius:999px}#fixwords-bar[data-idle] #fixwords-title{padding:0 12px;font-weight:500}" +
@@ -491,22 +489,23 @@
     "#fixwords-panel .fixwords-row button{border:1px solid var(--edge)}#fixwords-notice{display:flex;align-items:center;justify-content:space-between;gap:8px;overflow-wrap:anywhere}#fixwords-notice-text:before{content:'✓ ';color:var(--accent);font-weight:600}#fixwords-notice-text{flex:1;min-width:0;word-break:auto-phrase;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}#fixwords-panel #fixwords-undo{flex:none;border:1px solid var(--accent);color:var(--accent)}#fixwords-panel #fixwords-list-done{width:100%;min-height:48px;margin-top:8px;background:var(--accent);color:var(--accent-ink);font-weight:600}#fixwords-panel #fixwords-reset-all{color:var(--danger)}" +
     "body.fixwords-editing [data-fixwords-editable]{outline:1px dashed #e0a200;outline-offset:3px}body.fixwords-editing [data-fixwords-editable]:focus{outline:2px solid #e0a200;background:rgba(224,162,0,.14)}body.fixwords-editing [data-fixwords-changed]{box-shadow:inset 0 -3px 0 #e0a200}body.fixwords-show-changes [data-fixwords-changed]{background:rgba(255,214,10,.55);outline:2px solid #e0a200;outline-offset:2px;color:#000}" +
     ".fixwords-marks{--surface:#fff;--ink:#191d22;--edge:rgba(25,29,34,.24);--accent:#0b6e66;--accent-ink:#fff}" +
-    "@media(prefers-color-scheme:dark){.fixwords-marks,#fixwords-svg-input,#fixwords-note-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#1f2329;--ink:#f2f4f6;--edge:rgba(242,244,246,.3);--accent:#35b3a7;--accent-ink:#191d22;--amber:#fbbf24;--danger:#f97066;--muted:#bdc4cd}}" +
+    "@media(prefers-color-scheme:dark){#fixwords-tools,.fixwords-marks,#fixwords-svg-input,#fixwords-note-input,#fixwords-bar,#fixwords-panel,#fixwords-handle{--surface:#1f2329;--ink:#f2f4f6;--edge:rgba(242,244,246,.3);--accent:#35b3a7;--accent-ink:#191d22;--amber:#fbbf24;--danger:#f97066;--muted:#bdc4cd}}" +
     "@media(hover:hover) and (pointer:fine){#fixwords-bar button:hover,#fixwords-panel button:hover,#fixwords-handle:hover{box-shadow:inset 0 0 0 2px var(--accent)}body.fixwords-editing [data-fixwords-editable]{cursor:text}}" +
     "@media(max-width:600px){#fixwords-bar:not([data-idle]),#fixwords-panel{right:0;bottom:0;width:100%;border-radius:16px 16px 0 0;padding-bottom:max(12px,env(safe-area-inset-bottom,0px));padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}}" +
     ".fixwords-box{fill:none;stroke:#e0a200;stroke-dasharray:3 2;vector-effect:non-scaling-stroke;pointer-events:none}.fixwords-box.changed{fill:rgba(224,162,0,.16);stroke-dasharray:none}" +
     "#fixwords-svg-input{position:absolute;right:auto;bottom:auto;z-index:2147482999;font-size:16px;min-height:44px;padding:8px;border:2px solid #e0a200;border-radius:8px;margin:0}" +
     "#fixwords-note-input{display:block;position:absolute;right:auto;bottom:auto;z-index:2147482999;font-size:16px;font-weight:400;min-height:44px;padding:8px;border:2px solid #2563eb;border-radius:8px;margin:0;resize:none;overflow:auto}" +
-    "[data-fixwords-noted]{text-decoration:underline dotted #2563eb 2px;text-underline-offset:4px}.fixwords-box.noted{stroke:#2563eb;stroke-dasharray:1 3;stroke-linecap:round}#fixwords-bar #fixwords-pagenote[data-noted]{box-shadow:inset 0 -3px 0 #2563eb}#fixwords-bar #fixwords-comment[aria-pressed=true]{background:#2563eb;color:#fff;font-weight:600}" +
-    "#fixwords-mode{margin:4px 0 10px;padding:10px 12px;border-radius:10px;background:rgba(37,99,235,.1);color:#1e40af;font-weight:600}@media(prefers-color-scheme:dark){#fixwords-mode{background:rgba(96,165,250,.16);color:#bfdbfe}}" +
-    "body.fixwords-commenting [data-fixwords-editable]{outline-color:#2563eb}body.fixwords-commenting .fixwords-box:not(.changed){stroke:#2563eb}" +
+    "[data-fixwords-noted]{text-decoration:underline dotted #2563eb 2px;text-underline-offset:4px}.fixwords-box.noted{stroke:#2563eb;stroke-dasharray:1 3;stroke-linecap:round}#fixwords-bar #fixwords-pagenote[data-noted]{box-shadow:inset 0 -3px 0 #2563eb}" +
+    "#fixwords-tools{--surface:#fff;--ink:#191d22;--edge:rgba(25,29,34,.24);--accent:#0b6e66;position:absolute;z-index:2147482999;box-sizing:border-box;display:flex;gap:4px;padding:4px;border-radius:12px;background:var(--surface);color:var(--ink);border:1px solid var(--edge);box-shadow:0 2px 12px rgba(0,0,0,.28);font:500 15px/1.5 'Hiragino Sans','Yu Gothic','Noto Sans CJK JP',sans-serif}#fixwords-tools[hidden]{display:none!important}" +
+    "#fixwords-tools button{box-sizing:border-box;min-width:44px;min-height:44px;margin:0;font:inherit;border:0;border-radius:8px;background:transparent;color:inherit;padding:6px 12px;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}#fixwords-tools button:focus-visible{outline:3px solid var(--accent);outline-offset:1px}" +
+    "@media(hover:hover) and (pointer:fine){#fixwords-tools button:hover{box-shadow:inset 0 0 0 2px var(--accent)}}" +
     ".fixwords-note-pin{position:absolute;z-index:2147482998;box-sizing:border-box;width:32px;height:32px;margin:0;padding:0;border:0;border-radius:50%;background:#2563eb;color:#fff;font:15px/32px sans-serif;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}" +
     ".fixwords-note-pin:focus-visible{outline:3px solid #2563eb;outline-offset:2px}" +
     ".fixwords-marks{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0;padding:0;border:0;background:none;font:500 15px/1.3 'Hiragino Sans','Yu Gothic','Noto Sans CJK JP',sans-serif;text-align:left}" +
     ".fixwords-marks button[role=radio]{box-sizing:border-box;display:inline-block;width:auto;min-width:48px;min-height:32px;margin:0;padding:4px 14px;font:inherit;line-height:1.3;letter-spacing:normal;text-transform:none;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--edge);border-radius:999px;box-shadow:none;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}" +
     ".fixwords-marks button[role=radio][aria-checked=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}.fixwords-marks button[role=radio]:focus-visible{outline:3px solid var(--accent);outline-offset:2px}" +
     "@media(pointer:coarse){.fixwords-marks button[role=radio]{min-height:44px;min-width:56px}}" +
-    "@media print{.fixwords-box,.fixwords-note-pin,#fixwords-svg-input,#fixwords-note-input{display:none!important}}" +
+    "@media print{.fixwords-box,.fixwords-note-pin,#fixwords-tools,#fixwords-svg-input,#fixwords-note-input{display:none!important}}" +
     "@media(prefers-reduced-motion:reduce){#fixwords-bar,#fixwords-panel,#fixwords-bar button,#fixwords-panel button,#fixwords-handle,#fixwords-status{transition:none}}";
   document.head.appendChild(css);
   function element(tag, id, parent, label) {
@@ -520,19 +519,22 @@
   // Hide tucks the bar into the pen button and keeps editing on; the cross also ends editing.
   var hide = button(t("hide"), header, "hide");
   var close = button(t("iconClose"), header, "close"); close.setAttribute("aria-label", t("close"));
+  // While the bar is open, the status takes the title's place in the header.
+  var status = element("div", "status"); status.setAttribute("role", "status");
+  header.insertBefore(status, hide);
   var content = element("div", "content", bar);
-  var modeHint = element("div", "mode", content, t("commentHint"));
   var guide = element("div", "guide", content);
   element("div", "", guide, t("stepOne"));
   element("div", "", guide, destination ? t("stepDestination") + destination : t("stepTwo"));
   element("strong", "", guide, t("guide"));
-  var status = element("div", "status", content); status.setAttribute("role", "status");
   var send = button("", content, "send");
   var secondary = element("div", "secondary", content);
   var toggle = button(t("continue"), secondary);
   var reset = button(t("reset"), secondary, "reset");
-  var commentBtn = button(t("comment"), secondary, "comment");
   var pageBtn = button(t("pageComment"), secondary, "pagenote"); pageBtn.hidden = true;
+  var tools = element("div", "tools", document.body); tools.hidden = true;
+  tools.setAttribute("role", "toolbar"); tools.setAttribute("aria-label", t("toolsLabel"));
+  var commentTool = button(t("comment"), tools);
   var handle = button(t("iconEdit"), document.body, "handle");
   var badge = element("span", "badge", handle); badge.setAttribute("aria-hidden", "true");
   var panel = element("div", "panel", document.body); panel.hidden = true;
@@ -586,11 +588,9 @@
     var e = changes().length, m = noteCount(), k = markCount(), n = e + m, all = n + k, pending = all && unsent(), idle = !editing && !all;
     bar.hidden = closed || tucked; handle.hidden = !bar.hidden; hide.hidden = idle;
     if (idle) bar.setAttribute("data-idle", ""); else bar.removeAttribute("data-idle");
-    start.textContent = idle ? t("startIdle") : t("start");
-    content.hidden = idle; guide.hidden = !editing || all > 0 || commenting; reset.hidden = !all;
-    modeHint.hidden = !commenting; commentBtn.textContent = t(commenting ? "commentDone" : "comment");
-    commentBtn.hidden = idle; commentBtn.setAttribute("aria-pressed", commenting ? "true" : "false");
-    pageBtn.hidden = !commenting; if (pageNote) pageBtn.setAttribute("data-noted", ""); else pageBtn.removeAttribute("data-noted");
+    start.hidden = !idle; status.hidden = idle;
+    content.hidden = idle; guide.hidden = !editing || all > 0; reset.hidden = !all;
+    pageBtn.hidden = idle; if (pageNote) pageBtn.setAttribute("data-noted", ""); else pageBtn.removeAttribute("data-noted");
     toggle.textContent = editing ? t("stop") : t("continue");
     toggle.setAttribute("aria-pressed", editing ? "true" : "false");
     if (choices.length) {
@@ -634,6 +634,7 @@
     } catch (e) { /* getBBox can throw for a label that is not rendered. */ }
   }
   function mark() {
+    updateTools();
     items.forEach(function (it) {
       var changed = text(it.node) !== it.original;
       if (it.svg) markSvg(it, changed, !!it.note);
@@ -711,6 +712,7 @@
     var input = svgInput, it = svgItem;
     var value = input.value.replace(/\s*\n\s*/g, " ").trim();
     svgInput = null; svgItem = null;
+    if (toolItem === it) hideTools();
     input.remove();
     if (!cancel && value && value !== text(it.node)) put(it, value);
     hideSheet(); persist(); mark();
@@ -723,12 +725,16 @@
     svgInput.type = "text"; svgInput.setAttribute("aria-label", t("svgLabel"));
     svgInput.value = text(it.node);
     svgInput.addEventListener("input", placeSvg);
-    svgInput.addEventListener("blur", function () { finishSvg(false, false); });
+    svgInput.addEventListener("blur", function (e) {
+      if (e.relatedTarget && tools.contains(e.relatedTarget)) return;
+      finishSvg(false, false);
+    });
     svgInput.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !composing(e)) { e.preventDefault(); finishSvg(false, true); }
       else if (e.key === "Escape" && !composing(e)) { e.preventDefault(); e.stopPropagation(); finishSvg(true, true); }
     });
-    placeSvg(); svgInput.focus(); svgInput.select();
+    placeSvg(); showTools(it);
+    svgInput.focus(); svgInput.select();
   }
   // The comment field: one textarea for an element (target.item) or for the whole page (target.page).
   var noteInput = null, noteTarget = null;
@@ -747,7 +753,8 @@
     input.remove();
     if (!cancel) { if (target.page) pageNote = value; else target.item.note = value; }
     hideSheet(); persist(); mark();
-    if (focus) (target.page ? pageBtn : commenting || !target.item.pin || target.item.pin.hidden ? target.item.node : target.item.pin).focus();
+    // While editing, focus goes back to the text (and its toolbar); otherwise to the pin that opened the note.
+    if (focus) (target.page ? pageBtn : editing || !target.item.pin || target.item.pin.hidden ? target.item.node : target.item.pin).focus();
   }
   function openNote(target) {
     finishNote(false, false); hideSheet();
@@ -764,45 +771,83 @@
     if (noteInput) noteInput.setSelectionRange(noteInput.value.length, noteInput.value.length);
   }
   items.forEach(function (it) {
-    it.node.addEventListener("click", function () { if (commenting) openNote({ item: it }); });
-    if (!it.svg) {
-      it.node.addEventListener("keydown", function (e) {
-        if (!commenting || e.target !== it.node || e.ctrlKey || e.metaKey || e.altKey) return;
-        if (e.key === " " || (e.key === "Enter" && !composing(e))) { e.preventDefault(); openNote({ item: it }); }
-      });
-      return;
-    }
-    it.node.addEventListener("click", function () { if (editing && !commenting) openSvg(it); });
+    if (!it.svg) return;
+    it.node.addEventListener("click", function () { if (editing) openSvg(it); });
     it.node.addEventListener("keydown", function (e) {
-      if (editing && (e.key === " " || (e.key === "Enter" && !composing(e)))) {
-        e.preventDefault();
-        if (commenting) openNote({ item: it }); else openSvg(it);
-      }
+      if (editing && (e.key === " " || (e.key === "Enter" && !composing(e)))) { e.preventDefault(); openSvg(it); }
     });
   });
-  function setCommenting(on) {
-    finishSvg(false, false); finishNote(false, false);
-    if (commenting === on) { render(); return; }
-    commenting = on;
-    document.body.classList.toggle("fixwords-commenting", on);
-    items.forEach(function (it) {
-      if (it.svg) return;
-      // Text is a button reachable by Tab in comment mode; the page's own tabindex and role come back afterwards.
-      if (on) {
-        it.node.removeAttribute("contenteditable");
-        it.ownTab = it.node.getAttribute("tabindex"); it.ownRole = it.node.getAttribute("role");
-        if (it.ownTab === null) it.node.setAttribute("tabindex", "0");
-        it.node.setAttribute("role", "button");
-      } else {
-        if (it.ownTab === null) it.node.removeAttribute("tabindex");
-        if (it.ownRole === null) it.node.removeAttribute("role"); else it.node.setAttribute("role", it.ownRole);
-        if (editing) it.node.setAttribute("contenteditable", "plaintext-only");
-      }
-    });
-    render();
+  // The toolbar floats just above the text being edited (below it when there is no room above) and never under the bar.
+  var toolItem = null;
+  function toolNode() { return svgInput && svgItem === toolItem ? svgInput : toolItem.node; }
+  function placeTools() {
+    if (!toolItem || tools.hidden) return;
+    var r = toolNode().getBoundingClientRect(), viewport = document.documentElement.clientWidth;
+    tools.style.left = tools.style.top = "0px";
+    var zero = tools.getBoundingClientRect(), w = zero.width, h = zero.height;
+    var floor = (bar.hidden ? window.innerHeight : Math.min(bar.getBoundingClientRect().top, window.innerHeight)) - 8;
+    var left = Math.max(8, Math.min(r.right - w, viewport - w - 8));
+    var top = r.top - h - 6;
+    if (top < 8) top = r.bottom + 6;
+    if (top + h > floor) top = Math.max(8, Math.min(r.top - h - 6, floor - h));
+    if (top < 8 || top + h > floor) top = 8;
+    tools.style.left = left - zero.left + "px";
+    tools.style.top = top - zero.top + "px";
   }
+  function updateTools() {
+    if (!toolItem || tools.hidden) return;
+    commentTool.textContent = t(toolItem.note ? "commentEdit" : "comment");
+    placeTools();
+  }
+  function showTools(it) {
+    toolItem = it; tools.hidden = false;
+    updateTools();
+  }
+  function hideTools() { toolItem = null; tools.hidden = true; }
+  tools.addEventListener("mousedown", function (e) { e.preventDefault(); });
+  commentTool.addEventListener("click", function () {
+    var it = toolItem;
+    if (!it) return;
+    if (svgInput && svgItem === it) finishSvg(false, false);
+    openNote({ item: it });
+  });
+  function backToText() { (svgInput && svgItem === toolItem ? svgInput : toolItem.node).focus(); }
+  tools.addEventListener("keydown", function (e) {
+    if (!toolItem || composing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+    var buttons = Array.prototype.filter.call(tools.querySelectorAll("button"), function (b) { return !b.hidden; });
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); backToText(); }
+    else if (e.key === "Tab" && e.shiftKey && e.target === buttons[0]) { e.preventDefault(); backToText(); }
+    else if (e.key === "Tab" && !e.shiftKey && e.target === buttons[buttons.length - 1]) {
+      e.preventDefault();
+      var next = items[items.indexOf(toolItem) + 1];
+      (next ? next.node : send).focus();
+    }
+  });
+  tools.addEventListener("focusout", function (e) {
+    // Leaving the toolbar for anything but the label's field ends the label edit.
+    if (svgInput && e.relatedTarget !== svgInput && !(e.relatedTarget && tools.contains(e.relatedTarget))) finishSvg(false, false);
+  });
+  document.addEventListener("focusin", function (e) {
+    var el = e.target;
+    if (!editing || !panel.hidden) { hideTools(); return; }
+    if (tools.contains(el) || (svgInput && el === svgInput)) return;
+    if (noteInput && el === noteInput && toolItem && noteTarget.item === toolItem) return;
+    var it = items.filter(function (x) { return !x.svg && x.node === el; })[0];
+    if (it) showTools(it); else hideTools();
+  });
+  document.addEventListener("keydown", function (e) {
+    // Tab leaves the text for its toolbar, and comes back through it.
+    if (e.key !== "Tab" || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || composing(e) || !toolItem || tools.hidden) return;
+    if (e.target !== toolNode()) return;
+    e.preventDefault(); commentTool.focus();
+  });
+  var toolFrame = 0;
+  window.addEventListener("scroll", function () {
+    if (!toolItem || toolFrame) return;
+    toolFrame = window.requestAnimationFrame(function () { toolFrame = 0; placeTools(); });
+  }, { passive: true });
   function setEditing(on) {
-    if (!on) { finishSvg(false, false); if (commenting) setCommenting(false); }
+    if (!on) { finishSvg(false, false); finishNote(false, false); hideTools(); }
     editing = on;
     document.body.classList.toggle("fixwords-editing", on);
     items.forEach(function (it) {
@@ -883,14 +928,15 @@
     setUndo(null);
     bar.removeAttribute("data-sheet"); panel.hidden = true; panel.removeAttribute("data-visible");
     document.body.classList.remove("fixwords-show-changes"); render();
-    if (wasOpen && restoreFocus === true) (bar.hidden ? handle : wasList ? (!reset.hidden ? reset : start) : send).focus();
+    // The title is hidden while the bar is open, so the fallback is the visible start/finish button.
+    if (wasOpen && restoreFocus === true) (bar.hidden ? handle : wasList ? (!reset.hidden ? reset : start.hidden ? toggle : start) : send).focus();
   }
   function openPanel(view, label) {
     setUndo(null);
     sendView.hidden = view !== sendView; listView.hidden = view !== listView;
     panel.setAttribute("aria-label", label);
     bar.setAttribute("data-sheet", ""); reveal(panel);
-    document.body.classList.add("fixwords-show-changes"); mark(); layout();
+    document.body.classList.add("fixwords-show-changes"); hideTools(); mark(); layout();
   }
   function showSheet(value) {
     sheetText = value; area.value = value; openPanel(sendView, t("sendLabel"));
@@ -945,11 +991,15 @@
     } catch (e) { if (e && e.name === "AbortError") { result(value, "offer"); return; } }
     copyReport(value);
   }
-  start.addEventListener("click", function () { if (!editing) setEditing(true); });
-  toggle.addEventListener("click", function () { setEditing(!editing); });
-  commentBtn.addEventListener("click", function () {
-    if (!editing) setEditing(true);
-    setCommenting(!commenting);
+  start.addEventListener("click", function () {
+    if (editing) return;
+    setEditing(true);
+    // The title hides itself; keep keyboard focus on a visible button.
+    if (start.hidden) toggle.focus();
+  });
+  toggle.addEventListener("click", function () {
+    setEditing(!editing);
+    if (!toggle.offsetParent && !start.hidden) start.focus();
   });
   pageBtn.addEventListener("click", function () { openNote({ page: true }); });
   document.addEventListener("input", function (e) {
@@ -977,7 +1027,6 @@
   document.addEventListener("keydown", function (e) {
     if (e.key !== "Escape" || composing(e)) return;
     if (!panel.hidden) { e.preventDefault(); hideSheet(true); }
-    else if (commenting) { e.preventDefault(); setCommenting(false); (bar.hidden ? handle : commentBtn).focus(); }
   });
   function setClosed(on) {
     closed = on; tucked = false;
@@ -1002,7 +1051,7 @@
     sent = ""; hideSheet(true); persist(); mark();
   });
   window.addEventListener("beforeunload", function (e) { if (unsent()) { e.preventDefault(); e.returnValue = ""; } });
-  window.addEventListener("resize", function () { layout(); placeSvg(); placeNote(); placePins(); });
+  window.addEventListener("resize", function () { layout(); placeSvg(); placeNote(); placeTools(); placePins(); });
   window.addEventListener("load", placePins);
   if (typeof ResizeObserver !== "undefined") { new ResizeObserver(layout).observe(bar); new ResizeObserver(placePins).observe(document.body); }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(placePins);

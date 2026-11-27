@@ -20,7 +20,12 @@ exports.setup = async function () {
       close: async () => { await browser.close(); await new Promise(r => server.close(r)); } };
   } catch (err) { server.close(); throw err; }
 };
-exports.start = page => page.locator('#fixwords-title').click();
+// The title only shows while the bar is idle; with saved changes the bar offers "Keep editing" instead.
+exports.start = async page => {
+  const title = page.locator('#fixwords-title');
+  if (await title.isVisible()) await title.click();
+  else await page.locator('#fixwords-bar button').filter({ hasText: /^(Keep editing|続けて直す)$/ }).click();
+};
 exports.edit = async (page, selector = '#dup2', value = 'Fresh bread') => {
   await page.locator(selector).fill(value);
   await page.locator(selector).blur();
